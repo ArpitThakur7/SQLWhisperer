@@ -148,162 +148,159 @@ def render_result(result: dict) -> None:
         raw_rows = [r.get("data", r) if isinstance(r, dict) else r for r in results]
         df = pd.DataFrame(raw_rows)
 
-        with st.expander("📊 Data Table & Visualizations", expanded=True):
-            tab_table, tab_chart = st.tabs(["📋 Table View", "📈 Auto-Chart"])
+        tab_table, tab_chart = st.tabs(["📋 Table View", "📈 Auto-Chart Studio"])
 
-            with tab_table:
-                st.dataframe(df, use_container_width=True)
-                csv_bytes = df.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    label="📥 Download as CSV",
-                    data=csv_bytes,
-                    file_name="sqlwhisperer_query_results.csv",
-                    mime="text/csv",
-                    key=f"dl_{result.get('query_id', id(df))}",
-                )
+        with tab_table:
+            st.dataframe(df, use_container_width=True)
+            csv_bytes = df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="📥 Download as CSV",
+                data=csv_bytes,
+                file_name="sqlwhisperer_query_results.csv",
+                mime="text/csv",
+                key=f"dl_{result.get('query_id', id(df))}",
+            )
 
-            with tab_chart:
-                if df.empty:
-                    st.info("No data available to visualize.")
-                else:
-                    rec = detect_best_chart(df, question=result.get("question", ""))
-                    all_cols = df.columns.tolist()
-                    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+        with tab_chart:
+            if df.empty:
+                st.info("No data available to visualize.")
+            else:
+                rec = detect_best_chart(df, question=result.get("question", ""))
+                all_cols = df.columns.tolist()
+                num_cols = df.select_dtypes(include=["number"]).columns.tolist()
 
-                    # ── Statistical KPI Summary Ribbon ────────────────
-                    stats = calculate_data_stats(df, rec.y_col)
-                    if "total" in stats:
-                        st1, st2, st3, st4 = st.columns(4)
-                        st1.metric(
-                            label=f"Σ Total {stats.get('metric', '').replace('_', ' ').title()}",
-                            value=f"{stats['total']:,.0f}" if stats["total"] >= 100 else f"{stats['total']:,.2f}",
-                        )
-                        st2.metric(
-                            label=f"μ Average",
-                            value=f"{stats['mean']:,.2f}",
-                        )
-                        st3.metric(
-                            label=f"↑ Peak ({stats.get('peak_label', '')[:12]})",
-                            value=f"{stats['max']:,.0f}" if stats["max"] >= 100 else f"{stats['max']:,.2f}",
-                        )
-                        st4.metric(
-                            label="N Rows Analyzed",
-                            value=f"{stats['row_count']:,}",
-                        )
-                        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+                # ── Statistical KPI Summary Ribbon ────────────────
+                stats = calculate_data_stats(df, rec.y_col)
+                if "total" in stats:
+                    st1, st2, st3, st4 = st.columns(4)
+                    st1.metric(
+                        label=f"Σ Total {stats.get('metric', '').replace('_', ' ').title()}",
+                        value=f"{stats['total']:,.0f}" if stats["total"] >= 100 else f"{stats['total']:,.2f}",
+                    )
+                    st2.metric(
+                        label=f"μ Average",
+                        value=f"{stats['mean']:,.2f}",
+                    )
+                    st3.metric(
+                        label=f"↑ Peak ({stats.get('peak_label', '')[:12]})",
+                        value=f"{stats['max']:,.0f}" if stats["max"] >= 100 else f"{stats['max']:,.2f}",
+                    )
+                    st4.metric(
+                        label="N Rows Analyzed",
+                        value=f"{stats['row_count']:,}",
+                    )
+                    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-                    # ── Studio Controls Toolbar ───────────────────────
-                    with st.expander("🎨 Visualization Studio & Customizer", expanded=False):
-                        ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([2, 1.5, 1.5, 1])
-                        with ctrl1:
-                            chart_options = [
-                                "Auto (Recommended)",
-                                "Treemap",
-                                "Heatmap",
-                                "Funnel",
-                                "Choropleth",
-                                "Area",
-                                "Line",
-                                "Pie",
-                                "Bar",
-                                "Scatter",
-                                "Box",
-                                "Metric",
-                            ]
-                            chosen_chart = st.selectbox(
-                                "📊 Chart Type",
-                                chart_options,
-                                key=f"ctype_{id(df)}",
-                                help="Automatically selected or override with advanced formats like Treemap, Heatmap, Funnel, or Choropleth.",
-                            )
-                        with ctrl2:
-                            x_default_idx = (
-                                all_cols.index(rec.x_col)
-                                if rec.x_col in all_cols
-                                else 0
-                            )
-                            custom_x = st.selectbox(
-                                "X-Axis / Category",
-                                all_cols,
-                                index=x_default_idx if all_cols else 0,
-                                key=f"cx_{id(df)}",
-                            )
-                        with ctrl3:
-                            y_choices = num_cols if num_cols else all_cols
-                            y_default_idx = (
-                                y_choices.index(rec.y_col)
-                                if rec.y_col in y_choices
-                                else 0
-                            )
-                            custom_y = st.selectbox(
-                                "Y-Axis / Measure",
-                                y_choices,
-                                index=y_default_idx if y_choices else 0,
-                                key=f"cy_{id(df)}",
-                            )
-                        with ctrl4:
-                            chosen_palette = st.selectbox(
-                                "Theme Palette",
-                                list(PALETTES.keys()),
-                                key=f"pal_{id(df)}",
-                            )
-
-                        show_trend = st.checkbox("📈 Show Trendline / Rolling Average", value=False, key=f"trend_{id(df)}")
-
-                    # Determine effective parameters
-                    override_type = None if chosen_chart.startswith("Auto") else chosen_chart.lower()
-                    active_palette = chosen_palette if "chosen_palette" in locals() else "Cyberpunk Neon"
-
+                # ── Studio Controls Toolbar ───────────────────────
+                col_info, col_popover = st.columns([3, 1])
+                with col_info:
                     st.caption(
                         f"✨ **AI Visualizer Insight**: *{rec.reason}* "
                         f"| Recommendation: `{rec.chart_type.upper()}` ({int(rec.confidence * 100)}% match)"
                     )
-
-                    try:
-                        fig = create_plotly_figure(
-                            df,
-                            rec=rec,
-                            override_type=override_type,
-                            override_x=custom_x if "custom_x" in locals() else rec.x_col,
-                            override_y=custom_y if "custom_y" in locals() else rec.y_col,
-                            palette_name=active_palette,
-                            show_trendline=show_trend if "show_trend" in locals() else False,
+                with col_popover:
+                    with st.popover("⚙️ Customize Visual"):
+                        chart_options = [
+                            "Auto (Recommended)",
+                            "Treemap",
+                            "Heatmap",
+                            "Funnel",
+                            "Choropleth",
+                            "Area",
+                            "Line",
+                            "Pie",
+                            "Bar",
+                            "Scatter",
+                            "Box",
+                            "Metric",
+                        ]
+                        chosen_chart = st.selectbox(
+                            "📊 Chart Type",
+                            chart_options,
+                            key=f"ctype_{id(df)}",
                         )
-                        st.plotly_chart(
-                            fig,
-                            use_container_width=True,
-                            config={
-                                "displayModeBar": True,
-                                "toImageButtonOptions": {
-                                    "format": "png",
-                                    "filename": "sqlwhisperer_analytics",
-                                    "height": 600,
-                                    "width": 1000,
-                                    "scale": 2,
-                                },
+                        x_default_idx = (
+                            all_cols.index(rec.x_col)
+                            if rec.x_col in all_cols
+                            else 0
+                        )
+                        custom_x = st.selectbox(
+                            "X-Axis / Category",
+                            all_cols,
+                            index=x_default_idx if all_cols else 0,
+                            key=f"cx_{id(df)}",
+                        )
+                        y_choices = num_cols if num_cols else all_cols
+                        y_default_idx = (
+                            y_choices.index(rec.y_col)
+                            if rec.y_col in y_choices
+                            else 0
+                        )
+                        custom_y = st.selectbox(
+                            "Y-Axis / Measure",
+                            y_choices,
+                            index=y_default_idx if y_choices else 0,
+                            key=f"cy_{id(df)}",
+                        )
+                        chosen_palette = st.selectbox(
+                            "Theme Palette",
+                            list(PALETTES.keys()),
+                            key=f"pal_{id(df)}",
+                        )
+                        show_trend = st.checkbox(
+                            "📈 Show Trendline / Moving Avg",
+                            value=False,
+                            key=f"trend_{id(df)}",
+                        )
+
+                # Determine effective parameters
+                override_type = None if "chosen_chart" not in locals() or chosen_chart.startswith("Auto") else chosen_chart.lower()
+                active_palette = chosen_palette if "chosen_palette" in locals() else "Cyberpunk Neon"
+
+                try:
+                    fig = create_plotly_figure(
+                        df,
+                        rec=rec,
+                        override_type=override_type,
+                        override_x=custom_x if "custom_x" in locals() else rec.x_col,
+                        override_y=custom_y if "custom_y" in locals() else rec.y_col,
+                        palette_name=active_palette,
+                        show_trendline=show_trend if "show_trend" in locals() else False,
+                    )
+                    st.plotly_chart(
+                        fig,
+                        use_container_width=True,
+                        config={
+                            "displayModeBar": True,
+                            "toImageButtonOptions": {
+                                "format": "png",
+                                "filename": "sqlwhisperer_analytics",
+                                "height": 600,
+                                "width": 1000,
+                                "scale": 2,
                             },
-                        )
+                        },
+                    )
 
-                        # Automated Analytical Highlights
-                        insights = generate_visual_insights(df, rec, stats)
-                        if insights:
-                            with st.container():
-                                st.markdown("##### 💡 Analytical Highlights")
-                                for ins in insights:
-                                    st.markdown(f"- {ins}")
+                    # Automated Analytical Highlights
+                    insights = generate_visual_insights(df, rec, stats)
+                    if insights:
+                        st.markdown("##### 💡 Key Analytical Highlights")
+                        for ins in insights:
+                            st.markdown(f"- {ins}")
 
-                        # Interactive HTML export
-                        html_bytes = fig.to_html(include_plotlyjs="cdn").encode("utf-8")
-                        st.download_button(
-                            label="🌐 Download Interactive Chart (HTML)",
-                            data=html_bytes,
-                            file_name="sqlwhisperer_chart.html",
-                            mime="text/html",
-                            key=f"html_dl_{id(df)}",
-                        )
-                    except Exception as chart_err:
-                        st.warning(f"Could not render visual: {chart_err}")
-                        st.dataframe(df, use_container_width=True)
+                    # Interactive HTML export
+                    html_bytes = fig.to_html(include_plotlyjs="cdn").encode("utf-8")
+                    st.download_button(
+                        label="🌐 Download Interactive Chart (HTML)",
+                        data=html_bytes,
+                        file_name="sqlwhisperer_chart.html",
+                        mime="text/html",
+                        key=f"html_dl_{id(df)}",
+                    )
+                except Exception as chart_err:
+                    st.warning(f"Could not render visual: {chart_err}")
+                    st.dataframe(df, use_container_width=True)
 
     elif result.get("success"):
         st.info("Query executed successfully but returned zero rows.")
