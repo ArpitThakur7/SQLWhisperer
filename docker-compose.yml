@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL (Target Database) ──────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sqlwhisperer
+      POSTGRES_USER: sqlwhisperer
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sqlwhisperer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ───────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - DATABASE_URL=postgresql://sqlwhisperer:${POSTGRES_PASSWORD:-localdev123}@postgres:5432/sqlwhisperer
+      - HISTORY_DB_URL=sqlite:///./data/query_history.db
+      - CHROMA_PERSIST_DIR=./data/chroma
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/v1/health').raise_for_status()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Streamlit Frontend ────────────────────────────────────────
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000/api/v1
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  app_data:

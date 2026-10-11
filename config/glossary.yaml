@@ -1,0 +1,37 @@
+# SQLWhisperer — Semantic Business Glossary & Domain Rules
+#
+# Bridges the gap between company-specific business jargon and raw database tables.
+# Matching terms and rules are dynamically injected into the Text2SQL prompt context.
+
+metrics:
+  active_customer:
+    description: "A customer who has placed at least 1 non-cancelled order in the last 90 days."
+    guidance: "Filter customers who have orders with status IN ('confirmed', 'shipped', 'delivered') within the last 90 days."
+  revenue:
+    description: "Total gross dollar value of non-cancelled orders."
+    guidance: "SUM(orders.total_amount) WHERE orders.status != 'cancelled'"
+  net_profit:
+    description: "Gross margin across all completed order items."
+    guidance: "SUM((order_items.unit_price - products.cost) * order_items.quantity) from completed orders."
+  aov:
+    description: "Average Order Value."
+    guidance: "AVG(orders.total_amount) excluding cancelled orders."
+  churned_customer:
+    description: "A customer who has not placed an order in over 180 days."
+    guidance: "Customers with no orders in the last 180 days, or having only cancelled orders."
+
+synonyms:
+  buyers: "customers"
+  clients: "customers"
+  users: "customers"
+  items: "products"
+  merchandise: "products"
+  skus: "products"
+  sales: "orders"
+  purchases: "orders"
+  transactions: "orders"
+
+rules:
+  - "Always exclude orders with status = 'cancelled' when computing revenue, order counts, or sales volume unless explicitly requested."
+  - "When the user asks for 'top products', rank by total revenue (or quantity sold if specified) in descending order."
+  - "Ensure table aliases are clear and standardized: c for customers, o for orders, p for products, oi for order_items."

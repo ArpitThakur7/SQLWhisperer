@@ -1,0 +1,91 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sqlwhisperer"
+version = "0.1.0"
+description = "Natural Language to Production SQL with Self-Healing, LCEL Chains & Security Guardrails"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "SQLWhisperer Contributors" }
+]
+keywords = [
+    "text-to-sql",
+    "sql",
+    "langchain",
+    "llm",
+    "natural-language-querying",
+    "self-healing",
+    "fastapi",
+    "streamlit",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-chroma>=0.2.0",
+    "openai>=1.50.0",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary>=2.9",
+    "chromadb>=0.5.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "streamlit>=1.38.0",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+]
+ast-security = [
+    "sqlglot>=25.0.0",
+]
+local-llm = [
+    "langchain-ollama>=0.2.0",
+]
+
+[project.scripts]
+sqlwhisperer = "src.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/sqlwhisperer/sqlwhisperer"
+Documentation = "https://github.com/sqlwhisperer/sqlwhisperer#readme"
+Issues = "https://github.com/sqlwhisperer/sqlwhisperer/issues"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]

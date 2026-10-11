@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQLWhisperer — Interactive Architecture Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0d16;
+      --bg-card: rgba(18, 24, 38, 0.75);
+      --bg-card-hover: rgba(28, 38, 62, 0.9);
+      --border-card: rgba(99, 102, 241, 0.2);
+      --border-highlight: rgba(99, 102, 241, 0.6);
+      
+      --accent-indigo: #6366f1;
+      --accent-purple: #a855f7;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --glow-indigo: 0 0 25px rgba(99, 102, 241, 0.35);
+      --glow-cyan: 0 0 25px rgba(6, 182, 212, 0.35);
+      --glow-emerald: 0 0 25px rgba(16, 185, 129, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.05) 0%, transparent 60%);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    /* Header & Navigation */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(16px);
+      background: rgba(10, 13, 22, 0.85);
+      border-bottom: 1px solid var(--border-card);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .brand-icon {
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, var(--accent-indigo), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.5));
+    }
+
+    .brand-title {
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      border-radius: 9999px;
+      margin-left: 0.5rem;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(18, 24, 38, 0.6);
+      padding: 0.35rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1.1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .tab-btn.active, .tab-btn:hover {
+      background: var(--accent-indigo);
+      color: #fff;
+      box-shadow: var(--glow-indigo);
+    }
+
+    .action-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 0.55rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .action-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    }
+
+    /* Container Layout */
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .hero-banner {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 0.6rem;
+      background: linear-gradient(135deg, #fff 30%, #a5b4fc 70%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      color: var(--text-muted);
+      max-width: 760px;
+      margin: 0 auto;
+      font-size: 1.05rem;
+    }
+
+    /* Canvas / Viewport Section */
+    .view-section {
+      display: none;
+      animation: fadeIn 0.35s ease forwards;
+    }
+
+    .view-section.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Diagram Grid Layout */
+    .arch-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+      position: relative;
+    }
+
+    .arch-tier {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 16px;
+      padding: 1.5rem;
+      position: relative;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.3s ease;
+    }
+
+    .arch-tier:hover {
+      border-color: var(--border-highlight);
+    }
+
+    .tier-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .tier-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tier-badge {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+    }
+
+    .nodes-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* Interactive Node Cards */
+    .node-card {
+      background: rgba(15, 20, 32, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 1.2rem;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .node-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--accent-indigo);
+      box-shadow: var(--glow-indigo);
+      background: var(--bg-card-hover);
+    }
+
+    .node-card.highlighted {
+      border-color: var(--accent-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .node-card.danger {
+      border-color: rgba(244, 63, 94, 0.4);
+    }
+
+    .node-card.danger:hover {
+      border-color: var(--accent-rose);
+      box-shadow: 0 0 25px rgba(244, 63, 94, 0.35);
+    }
+
+    .node-icon {
+      font-size: 1.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #c7d2fe;
+    }
+
+    .node-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .node-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .node-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: auto;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #cbd5e1;
+    }
+
+    /* Core LCEL Pipeline Flow */
+    .pipeline-wrapper {
+      position: relative;
+    }
+
+    .pipeline-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 1rem;
+      position: relative;
+      z-index: 2;
+    }
+
+    @media (max-width: 1100px) {
+      .pipeline-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .pipeline-arrow {
+      position: absolute;
+      top: 50%;
+      right: -14px;
+      transform: translateY(-50%);
+      color: var(--accent-cyan);
+      font-size: 1.2rem;
+      z-index: 5;
+    }
+
+    /* Refinement Loop Banner */
+    .refinement-loop-bar {
+      margin-top: 1.25rem;
+      padding: 0.9rem 1.25rem;
+      border-radius: 10px;
+      background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(244, 63, 94, 0.12));
+      border: 1px dashed rgba(245, 158, 11, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #fde68a;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .loop-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .pulsing-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f59e0b;
+      box-shadow: 0 0 10px #f59e0b;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.7; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.7; }
+    }
+
+    /* Detail Modal / Drawer */
+    .drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .drawer-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .drawer {
+      width: 540px;
+      max-width: 90vw;
+      height: 100%;
+      background: #0f1422;
+      border-left: 1px solid var(--border-highlight);
+      padding: 2.5rem 2rem;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .drawer-overlay.open .drawer {
+      transform: translateX(0);
+    }
+
+    .drawer-close {
+      align-self: flex-end;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: var(--text-muted);
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .drawer-close:hover {
+      background: var(--accent-rose);
+      color: white;
+    }
+
+    .drawer-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+
+    .drawer-title {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .drawer-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .drawer-section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+
+    .code-box {
+      background: #090c14;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    /* Simulation Live Console */
+    .simulator-box {
+      background: #090d16;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .sim-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .sim-input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .sim-input:focus {
+      border-color: var(--accent-indigo);
+    }
+
+    .sim-btn {
+      background: var(--accent-indigo);
+      border: none;
+      color: white;
+      padding: 0 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .sim-logs {
+      background: #05070c;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 1rem;
+      height: 220px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+
+    .log-step {
+      color: #a5b4fc;
+      font-weight: 600;
+      min-width: 140px;
+    }
+
+    .log-msg {
+      color: #cbd5e1;
+    }
+
+    .log-success { color: #34d399; }
+    .log-warn { color: #fbbf24; }
+    .log-error { color: #f87171; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <span class="brand-icon">🔮</span>
+      <span class="brand-title">SQLWhisperer</span>
+      <span class="brand-badge">ARCHITECTURE ENGINE</span>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('system-tab')">System Topology</button>
+      <button class="tab-btn" onclick="switchTab('refinement-tab')">Self-Healing Loop</button>
+      <button class="tab-btn" onclick="switchTab('security-tab')">AST Security</button>
+      <button class="tab-btn" onclick="switchTab('sim-tab')">Interactive Simulator</button>
+    </div>
+
+    <button class="action-btn" onclick="runLiveSimulation()">
+      <span>▶ Run Pipeline Test</span>
+    </button>
+  </header>
+
+  <div class="container">
+    <div class="hero-banner">
+      <h1 class="hero-title">System Architecture Blueprint</h1>
+      <p class="hero-desc">
+        Explore the deep architectural topology of SQLWhisperer. Click any node to inspect its internal mechanics, inputs, outputs, and architectural decisions.
+      </p>
+    </div>
+
+    <!-- TAB 1: SYSTEM TOPOLOGY -->
+    <div id="system-tab" class="view-section active">
+      <div class="arch-grid">
+        
+        <!-- TIER 1: Presentation & Ingress -->
+        <div class="arch-tier">
+          <div class="tier-header">
+            <span class="tier-title"><span>💻</span> Tier 1: Presentation & Ingress Clients</span>
+            <span class="tier-badge">Multi-Client Surface</span>
+          </div>
+          <div class="nodes-row">
+            <div class="node-card" onclick="openDrawer('streamlit')">
+              <div class="node-icon">🔮</div>
+              <div class="node-title">Streamlit Web App</div>
+              <div class="node-desc">Dark Glassmorphism UI, Auto-Charting (Bar/Line/Area), SQLite drag-and-drop, and Schema Explorer.</div>
+              <div class="node-tags">
+                <span class="tag">streamlit_app/app.py</span>
+                <span class="tag">Port 8501</span>
+              </div>
+            </div>
+
+            <div class="node-card" onclick="openDrawer('cli')">
+              <div class="node-icon">⌨️</div>
+              <div class="node-title">Terminal CLI</div>
+              <div class="node-desc">Command-line query interface for terminal users, script automation, and CI/CD pipelines.</div>
+              <div class="node-tags">
+                <span class="tag">src/cli/main.py</span>
+                <span class="tag">--sql-only</span>
+                <span class="tag">--json</span>
+              </div>
+            </div>
+
+            <div class="node-card" onclick="openDrawer('fastapi')">
+              <div class="node-icon">⚡</div>
+              <div class="node-title">FastAPI REST Gateway</div>
+              <div class="node-desc">Asynchronous endpoints for queries, thumbs feedback, audit history, and database diagnostics.</div>
+              <div class="node-tags">
+                <span class="tag">src/api/routes.py</span>
+                <span class="tag">OpenAPI 3.1</span>
+                <span class="tag">Port 8000</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TIER 2: Self-Healing Orchestration Core -->
+        <div class="arch-tier" style="border-color: rgba(99, 102, 241, 0.4); background: rgba(14, 18, 30, 0.85);">
+          <div class="tier-header">
+            <span class="tier-title" style="color: #a5b4fc;"><span>🧠</span> Tier 2: LangChain LCEL Self-Healing Pipeline</span>
+            <span class="tier-badge" style="background: rgba(99, 102, 241, 0.2); color: #c7d2fe;">Core Orchestrator</span>
+          </div>
+          
+          <div class="pipeline-wrapper">
+            <div class="pipeline-row">
+              <div class="node-card" id="node-schema" onclick="openDrawer('schema')">
+                <div class="node-icon">📋</div>
+                <div class="node-title">1. Schema Retriever</div>
+                <div class="node-desc">Two-stage table pruning & live SQLAlchemy DDL extraction.</div>
+                <div class="node-tags"><span class="tag">schema_retriever.py</span></div>
+              </div>
+
+              <div class="node-card" id="node-text2sql" onclick="openDrawer('text2sql')">
+                <div class="node-icon">✍️</div>
+                <div class="node-title">2. Text2SQL</div>
+                <div class="node-desc">Dialect-aware SQL generator with few-shot context.</div>
+                <div class="node-tags"><span class="tag">text2sql.py</span></div>
+              </div>
+
+              <div class="node-card" id="node-validator" onclick="openDrawer('validator')">
+                <div class="node-icon">🛡️</div>
+                <div class="node-title">3. Validator</div>
+                <div class="node-desc">Pydantic structured syntax & schema checker with auto-fix.</div>
+                <div class="node-tags"><span class="tag">validator.py</span></div>
+              </div>
+
+              <div class="node-card" id="node-executor" onclick="openDrawer('executor')">
+                <div class="node-icon">⚙️</div>
+                <div class="node-title">4. Safe Executor</div>
+                <div class="node-desc">sqlglot AST validation + row capping + timed execution.</div>
+                <div class="node-tags"><span class="tag">executor.py</span></div>
+              </div>
+
+              <div class="node-card" id="node-inspector" onclick="openDrawer('inspector')">
+                <div class="node-icon">🔍</div>
+                <div class="node-title">5. Inspector</div>
+                <div class="node-desc">AI data sanity checker for empty sets & row-count anomalies.</div>
+                <div class="node-tags"><span class="tag">inspector.py</span></div>
+              </div>
+
+              <div class="node-card" id="node-explainer" onclick="openDrawer('explainer')">
+                <div class="node-icon">💬</div>
+                <div class="node-title">6. Explainer</div>
+                <div class="node-desc">Plain-English non-technical executive summary of findings.</div>
+                <div class="node-tags"><span class="tag">explainer.py</span></div>
+              </div>
+            </div>
+
+            <!-- Refinement Loop Indicator -->
+            <div class="refinement-loop-bar">
+              <div class="loop-indicator">
+                <div class="pulsing-dot"></div>
+                <span>Autonomous Self-Healing Refinement Loop (up to 3 retries with dynamic error feedback)</span>
+              </div>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #fde68a;">max_refinement_retries = 3</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TIER 3: Split Columns: Semantic/Memory & Security/AST -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <!-- Left: Semantic & Memory -->
+          <div class="arch-tier">
+            <div class="tier-header">
+              <span class="tier-title"><span>📚</span> Tier 3A: Semantic Intelligence & Vector Memory</span>
+            </div>
+            <div class="nodes-row" style="grid-template-columns: 1fr;">
+              <div class="node-card" onclick="openDrawer('memory')">
+                <div class="node-icon">💾</div>
+                <div class="node-title">ChromaDB Vector Store & Feedback Loop</div>
+                <div class="node-desc">Persists verified query triplets with OpenAI embeddings. Dynamically learns from user thumbs-up and manual query edits.</div>
+                <div class="node-tags">
+                  <span class="tag">src/memory/few_shot_store.py</span>
+                  <span class="tag">k = 3</span>
+                </div>
+              </div>
+
+              <div class="node-card" onclick="openDrawer('glossary')">
+                <div class="node-icon">📖</div>
+                <div class="node-title">Semantic Domain Glossary</div>
+                <div class="node-desc">Translates business metrics (AOV, revenue, churn) and synonyms into exact SQL rules.</div>
+                <div class="node-tags">
+                  <span class="tag">config/glossary.yaml</span>
+                  <span class="tag">src/semantic/glossary.py</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Security & Guardrails -->
+          <div class="arch-tier">
+            <div class="tier-header">
+              <span class="tier-title"><span>🔒</span> Tier 3B: Dual-Layer AST & Execution Security</span>
+            </div>
+            <div class="nodes-row" style="grid-template-columns: 1fr;">
+              <div class="node-card danger" onclick="openDrawer('ast_guard')">
+                <div class="node-icon" style="background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.3); color: #fda4af;">🛡️</div>
+                <div class="node-title">sqlglot AST Deterministic Guard</div>
+                <div class="node-desc">Rejects multi-statements, verifies root is exp.Select, and walks AST to intercept subquery mutations.</div>
+                <div class="node-tags">
+                  <span class="tag">sqlglot.parse()</span>
+                  <span class="tag">exp.Select root check</span>
+                </div>
+              </div>
+
+              <div class="node-card" onclick="openDrawer('regex_guard')">
+                <div class="node-icon">🧱</div>
+                <div class="node-title">Regex Blocklist & Table Restriction</div>
+                <div class="node-desc">Defense-in-depth regex filter for DDL verbs and blocked schemas defined in settings.blocked_tables.</div>
+                <div class="node-tags">
+                  <span class="tag">DANGEROUS_PATTERNS</span>
+                  <span class="tag">settings.blocked_tables</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TIER 4: Multi-Dialect Storage & LLM Provider Factory -->
+        <div class="arch-tier">
+          <div class="tier-header">
+            <span class="tier-title"><span>🗄️</span> Tier 4: Multi-Dialect Storage & LLM Factory</span>
+          </div>
+          <div class="nodes-row">
+            <div class="node-card" onclick="openDrawer('db_connector')">
+              <div class="node-icon">🔄</div>
+              <div class="node-title">Dynamic DB Connector</div>
+              <div class="node-desc">Automatic zero-setup SQLite fallback, reflection, and dialect normalization for PostgreSQL/MySQL/DuckDB.</div>
+              <div class="node-tags"><span class="tag">src/db/connector.py</span></div>
+            </div>
+
+            <div class="node-card" onclick="openDrawer('sqlite_demo')">
+              <div class="node-icon">📦</div>
+              <div class="node-title">Demo SQLite DB</div>
+              <div class="node-desc">Embedded 500 customers, 100 products, 2,000 orders auto-seeded on initial boot.</div>
+              <div class="node-tags"><span class="tag">data/demo_ecommerce.db</span></div>
+            </div>
+
+            <div class="node-card" onclick="openDrawer('history_db')">
+              <div class="node-icon">📜</div>
+              <div class="node-title">Query Audit History</div>
+              <div class="node-desc">SQLite audit ledger recording latency, confidence, refinement count, and user ratings.</div>
+              <div class="node-tags"><span class="tag">logs/query_history.db</span></div>
+            </div>
+
+            <div class="node-card" onclick="openDrawer('llm_factory')">
+              <div class="node-icon">🤖</div>
+              <div class="node-title">Multi-LLM Factory</div>
+              <div class="node-desc">Supports Groq, Gemini 2.0 Flash, Ollama, OpenRouter, and OpenAI with runtime key switching.</div>
+              <div class="node-tags"><span class="tag">src/chains/llm_factory.py</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TAB 2: REFINEMENT STATE MACHINE -->
+    <div id="refinement-tab" class="view-section">
+      <div class="arch-tier">
+        <h2 style="margin-bottom: 1rem; color: #fff;">🔄 Autonomous Self-Healing State Machine</h2>
+        <p style="color: var(--text-muted); margin-bottom: 2rem;">
+          When validation fails, SQL execution encounters a database error, or the result inspector flags suspicious row counts, SQLWhisperer does not crash. It injects diagnostic failure context into the next iteration:
+        </p>
+
+        <div style="background: #090c14; border: 1px solid var(--border-card); border-radius: 12px; padding: 2rem; position: relative;">
+          <pre class="code-box" style="font-size: 0.88rem; line-height: 1.7;">
+[User Query] ──► Schema Retrieval + Semantic Rules + Few-Shot Memory
+     │
+     ▼
+[Attempt 1: Text2SQL] ──► Generated SQL Query
+     │
+     ├─► [Validation Check] ──(Syntax / Hallucination Error)──┐
+     │         │                                             │
+     │         ▼ (Valid)                                     │
+     ├─► [AST & DB Execution] ─(Runtime DB Failure)──────────┤
+     │         │                                             │
+     │         ▼ (Success)                                   │
+     ├─► [Result Inspector] ──(Empty set / Out-of-bounds)────┤
+     │         │                                             │
+     │         ▼ (Satisfactory)                              ▼
+     ▼                                           [Error Stack Recorded]
+[Business Explainer & Audit DB]                              │
+     │                                                       ▼
+     └───────────────────────────────────► [Attempt 2: Text2SQL with Diagnostics]
+                                          (Prompt includes failed queries & fixes)</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: AST SECURITY -->
+    <div id="security-tab" class="view-section">
+      <div class="arch-tier">
+        <h2 style="margin-bottom: 1rem; color: #fff;">🛡️ AST-Level Deterministic Guardrails</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+          SQL injection defense goes far beyond basic regex. SQLWhisperer parses the Abstract Syntax Tree using <code>sqlglot</code>:
+        </p>
+
+        <div class="nodes-row">
+          <div class="node-card">
+            <div class="node-icon">1️⃣</div>
+            <div class="node-title">Root Node Verification</div>
+            <div class="node-desc">Every statement root MUST be an instance of <code>exp.Select</code>. Multiple statements or stacked queries (e.g. <code>SELECT 1; DROP TABLE...</code>) are rejected immediately.</div>
+          </div>
+
+          <div class="node-card">
+            <div class="node-icon">2️⃣</div>
+            <div class="node-title">Recursive Sub-Tree Walking</div>
+            <div class="node-desc">Walks every branch of the syntax tree to ensure nested subqueries do not hide mutations (e.g. <code>exp.Insert</code>, <code>exp.Delete</code>, <code>exp.Drop</code>, <code>exp.Alter</code>).</div>
+          </div>
+
+          <div class="node-card">
+            <div class="node-icon">3️⃣</div>
+            <div class="node-title">Restricted Table Interceptor</div>
+            <div class="node-desc">Scans table tokens in the AST against <code>settings.blocked_tables</code> to safeguard internal schemas, credentials, and sensitive audit records.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: INTERACTIVE SIMULATOR -->
+    <div id="sim-tab" class="view-section">
+      <div class="simulator-box">
+        <h3 style="color: #fff; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>⚡</span> Live Self-Healing Pipeline Simulation
+        </h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
+          Test how the 6-stage LCEL chain resolves queries, handles mock column errors, and self-heals autonomously.
+        </p>
+
+        <div class="sim-bar">
+          <input type="text" id="sim-input-box" class="sim-input" value="Show top 5 customers by total revenue in 2026" />
+          <button class="sim-btn" onclick="executeSimulator()">▶ Run Pipeline</button>
+        </div>
+
+        <div class="sim-logs" id="sim-log-terminal">
+          <div class="log-line">
+            <span class="log-step">[SYSTEM READY]</span>
+            <span class="log-msg">SQLWhisperer pipeline initialized. Ready to simulate query execution.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Detail Drawer Modal -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer(event)">
+    <div class="drawer" id="drawerContent" onclick="event.stopPropagation()">
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+      <span class="drawer-badge" id="drawerBadge">COMPONENT</span>
+      <h2 class="drawer-title" id="drawerTitle">Component Title</h2>
+      <p class="drawer-desc" id="drawerDesc">Detailed description here.</p>
+
+      <div>
+        <div class="drawer-section-title">Source File Location</div>
+        <div class="code-box" id="drawerPath">src/...</div>
+      </div>
+
+      <div>
+        <div class="drawer-section-title">Key Responsibilities</div>
+        <ul id="drawerList" style="color: var(--text-muted); font-size: 0.9rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
+        </ul>
+      </div>
+
+      <div>
+        <div class="drawer-section-title">Input / Output Schema</div>
+        <div class="code-box" id="drawerSchema">...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // Component details registry
+    const components = {
+      streamlit: {
+        badge: "Presentation Tier",
+        title: "Streamlit Dark Glassmorphism UI",
+        desc: "Interactive web dashboard providing real-time data table viewing, dynamic database switching, and LLM provider configuration.",
+        path: "streamlit_app/app.py",
+        responsibilities: [
+          "Direct in-browser SQLite drag-and-drop file upload",
+          "Interactive Schema Explorer with live 3-row sample inspection",
+          "Auto-Charting: automatically detects categorical + numeric columns for Bar/Line/Area charts",
+          "One-click CSV download and user Thumbs Up/Down feedback triggers"
+        ],
+        schema: "HTTP (FastAPI client) -> Browser DOM"
+      },
+      cli: {
+        badge: "Presentation Tier",
+        title: "SQLWhisperer Command-Line Interface",
+        desc: "Terminal client enabling data engineers to query databases in English directly from terminal or bash scripts.",
+        path: "src/cli/main.py",
+        responsibilities: [
+          "Direct natural language query execution with ANSI formatting",
+          "--sql-only flag for piping clean SQL into psql/sqlite3",
+          "--json flag for automated CI/CD pipeline integration",
+          "sqlwhisperer health check diagnostic command"
+        ],
+        schema: "CLI Arguments -> Pipeline.invoke({'question': str})"
+      },
+      fastapi: {
+        badge: "API Gateway",
+        title: "FastAPI REST API Engine",
+        desc: "High-performance asynchronous API layer exposing query, feedback, audit, and schema inspection endpoints.",
+        path: "src/api/routes.py",
+        responsibilities: [
+          "POST /api/v1/query with dynamic session overrides",
+          "POST /api/v1/feedback for ChromaDB memory reinforcement",
+          "GET /api/v1/db/schema for column & constraint reflection",
+          "POST /api/v1/db/upload for multi-tenant SQLite database files"
+        ],
+        schema: "QueryRequest -> QueryResponse (Pydantic v2)"
+      },
+      schema: {
+        badge: "LCEL Chain 1",
+        title: "Schema Retriever Chain",
+        desc: "Lightweight LLM table selector followed by native SQLAlchemy inspection to extract precise DDL and 3 sample rows.",
+        path: "src/chains/schema_retriever.py",
+        responsibilities: [
+          "Prunes irrelevant tables to prevent context window bloat",
+          "Extracts column names, data types, primary keys, and foreign keys",
+          "Injects live sample rows for accurate JOIN and value generation"
+        ],
+        schema: "{'question': str} -> {'table_info': str, 'table_names': list[str]}"
+      },
+      text2sql: {
+        badge: "LCEL Chain 2",
+        title: "Text2SQL Generation Chain",
+        desc: "Synthesizes dialect-aware production SQL queries using schema context, semantic formulas, and ChromaDB few-shot examples.",
+        path: "src/chains/text2sql.py",
+        responsibilities: [
+          "Generates strictly read-only SELECT queries",
+          "Enforces column aliases and explicit column projection (no SELECT *)",
+          "Adapts date/time functions dynamically to target dialect",
+          "Includes previous failed attempts during refinement loops"
+        ],
+        schema: "{'question', 'table_info', 'few_shot_examples', 'dialect'} -> str"
+      },
+      validator: {
+        badge: "LCEL Chain 3",
+        title: "Structured SQL Validation Chain",
+        desc: "Structured Pydantic validator evaluating query syntax, schema hallucination, cartesian joins, and performance red flags.",
+        path: "src/chains/validator.py",
+        responsibilities: [
+          "Evaluates SQL correctness against provided schema DDL",
+          "Classifies severity: 'none', 'warning', or 'error'",
+          "Auto-Fixer: suggests fixed_sql for minor syntax or quote issues"
+        ],
+        schema: "{'question', 'sql', 'table_info'} -> ValidationResult"
+      },
+      executor: {
+        badge: "LCEL Chain 4",
+        title: "Safe DB Executor & AST Guard",
+        desc: "Executes queries against SQLAlchemy engines with strict sqlglot AST verification and row capping.",
+        path: "src/chains/executor.py",
+        responsibilities: [
+          "Validates statement AST root is exp.Select",
+          "Recursively verifies no subquery mutations (DELETE/DROP/ALTER)",
+          "Applies MAX_RESULT_ROWS = 100 capping and records execution time (ms)"
+        ],
+        schema: "{'sql': str} -> {'results', 'row_count', 'execution_time_ms', 'success'}"
+      },
+      inspector: {
+        badge: "LCEL Chain 5",
+        title: "Result Inspector Chain",
+        desc: "AI quality auditor checking if returned rows plausibly answer the user's intent without anomalies.",
+        path: "src/chains/inspector.py",
+        responsibilities: [
+          "Checks row-count sanity against ranking questions (e.g. top 5)",
+          "Detects unexpected empty result sets due to faulty WHERE clauses",
+          "Generates confidence score and actionable refinement suggestions"
+        ],
+        schema: "{'question', 'sql', 'results_preview', 'row_count'} -> InspectionResult"
+      },
+      explainer: {
+        badge: "LCEL Chain 6",
+        title: "Business Explainer Chain",
+        desc: "Translates query results into a non-technical executive summary with key findings and boundary caveats.",
+        path: "src/chains/explainer.py",
+        responsibilities: [
+          "Explains business intent in 2-3 plain English sentences",
+          "Highlights notable data findings and trends",
+          "Documents NULL handling and date range assumptions"
+        ],
+        schema: "{'question', 'sql', 'results_preview'} -> str (Markdown explanation)"
+      },
+      memory: {
+        badge: "Intelligence Layer",
+        title: "ChromaDB Few-Shot Vector Store",
+        desc: "Semantic vector memory storing verified Question-to-SQL pairs for retrieval-augmented generation.",
+        path: "src/memory/few_shot_store.py",
+        responsibilities: [
+          "Indexes successful queries via OpenAI or fallback embeddings",
+          "Retrieves top-3 semantically similar examples for prompt context",
+          "Integrates with feedback handler to learn continuously from users"
+        ],
+        schema: "add_example(q, sql, expl) / retrieve_examples(q, k=3)"
+      },
+      glossary: {
+        badge: "Semantic Layer",
+        title: "Domain Glossary & Business Rules",
+        desc: "Dynamic business metric compiler bridging company jargon to database definitions.",
+        path: "config/glossary.yaml",
+        responsibilities: [
+          "Standardizes metric formulas (revenue, AOV, active customer)",
+          "Resolves domain synonyms (buyers -> customers, sales -> orders)",
+          "Enforces mandatory business filters (e.g. order status != 'cancelled')"
+        ],
+        schema: "get_context(question: str) -> str (Prompt Injection)"
+      },
+      ast_guard: {
+        badge: "Security Layer",
+        title: "sqlglot AST Deterministic Guard",
+        desc: "Abstract Syntax Tree inspection engine providing compile-time verification of SQL safety.",
+        path: "src/chains/executor.py",
+        responsibilities: [
+          "Guarantees root statement is strictly exp.Select",
+          "Walks every AST node to detect nested mutations or DDL",
+          "Enforces restricted table policies via AST table node tokens"
+        ],
+        schema: "_validate_ast_safety(sql: str) -> (is_safe: bool, error: str?)"
+      },
+      db_connector: {
+        badge: "Storage Layer",
+        title: "Dynamic Database Connector",
+        desc: "Manages database connections, dialect detection, and zero-setup demo mode.",
+        path: "src/db/connector.py",
+        responsibilities: [
+          "Detects dialect: PostgreSQL, SQLite, MySQL, DuckDB, Snowflake",
+          "Automatically falls back to demo_ecommerce.db if Postgres is offline",
+          "Inspects tables, columns, and foreign keys via SQLAlchemy"
+        ],
+        schema: "get_engine() / get_dialect_name() / get_table_info()"
+      },
+      llm_factory: {
+        badge: "AI Layer",
+        title: "Multi-LLM Provider Factory",
+        desc: "Hot-swappable AI provider abstraction layer supporting cloud and 100% free local models.",
+        path: "src/chains/llm_factory.py",
+        responsibilities: [
+          "Supports 100% Free Groq (Llama 3.3 70B & Qwen 2.5 Coder)",
+          "Supports Google Gemini 2.0 Flash (Free tier)",
+          "Supports offline local Ollama and OpenRouter community models",
+          "Supports OpenAI GPT-4o flagship models"
+        ],
+        schema: "get_chat_llm(temperature=0) -> BaseChatModel"
+      }
+    };
+
+    function openDrawer(key) {
+      const item = components[key] || {
+        badge: "Component",
+        title: key.toUpperCase(),
+        desc: "Component documentation",
+        path: "src/",
+        responsibilities: ["Core pipeline operation"],
+        schema: "Input -> Output"
+      };
+
+      document.getElementById('drawerBadge').innerText = item.badge;
+      document.getElementById('drawerTitle').innerText = item.title;
+      document.getElementById('drawerDesc').innerText = item.desc;
+      document.getElementById('drawerPath').innerText = item.path;
+      document.getElementById('drawerSchema').innerText = item.schema;
+
+      const list = document.getElementById('drawerList');
+      list.innerHTML = '';
+      item.responsibilities.forEach(r => {
+        const li = document.createElement('li');
+        li.innerText = r;
+        list.appendChild(li);
+      });
+
+      document.getElementById('drawerOverlay').classList.add('open');
+    }
+
+    function closeDrawer(e) {
+      if (!e || e.target.id === 'drawerOverlay' || e.target.classList.contains('drawer-close')) {
+        document.getElementById('drawerOverlay').classList.remove('open');
+      }
+    }
+
+    // Live Simulator Log Generator
+    async function executeSimulator() {
+      const q = document.getElementById('sim-input-box').value;
+      const term = document.getElementById('sim-log-terminal');
+      term.innerHTML = '';
+
+      function addLog(step, msg, type = "") {
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.innerHTML = `
+          <span class="log-step">${step}</span>
+          <span class="log-msg ${type}">${msg}</span>
+        `;
+        term.appendChild(line);
+        term.scrollTop = term.scrollHeight;
+      }
+
+      addLog("[INIT]", `Received user question: "${q}"`);
+      await new Promise(r => setTimeout(r, 400));
+
+      addLog("[SCHEMA]", `Selected tables: ['customers', 'orders', 'order_items'] (pruned 12 tables)`, "log-success");
+      await new Promise(r => setTimeout(r, 400));
+
+      addLog("[GLOSSARY]", `Injected business metric: revenue = SUM(total_amount) WHERE status != 'cancelled'`, "log-success");
+      await new Promise(r => setTimeout(r, 400));
+
+      addLog("[VECTOR MEMORY]", `Retrieved 3 few-shot examples from ChromaDB (similarity > 0.86)`);
+      await new Promise(r => setTimeout(r, 500));
+
+      addLog("[ATTEMPT 1: TEXT2SQL]", `Generated SQL: SELECT c.name, SUM(o.total_amount) AS revenue FROM customers c JOIN orders o ON c.id = o.customer_id GROUP BY c.name ORDER BY revenue DESC LIMIT 5;`);
+      await new Promise(r => setTimeout(r, 500));
+
+      addLog("[VALIDATOR]", `SQL syntax and schema validated. 0 errors detected.`, "log-success");
+      await new Promise(r => setTimeout(r, 400));
+
+      addLog("[AST GUARD]", `sqlglot: Root statement is exp.Select. No mutation nodes detected. Safe.`, "log-success");
+      await new Promise(r => setTimeout(r, 400));
+
+      addLog("[EXECUTOR]", `Query executed on SQLite demo DB in 8.42ms. 5 rows returned.`, "log-success");
+      await new Promise(r => setTimeout(r, 400));
+
+      addLog("[INSPECTOR]", `Confidence score: 0.98. Row count and column relevance validated.`, "log-success");
+      await new Promise(r => setTimeout(r, 400));
+
+      addLog("[EXPLAINER]", `Summary: "Top customer is Acme Corp with $42,150.00 across 34 orders in 2026."`, "log-success");
+      addLog("[AUDIT DB]", `Query run saved to logs/query_history.db (query_id=142)`, "log-success");
+    }
+
+    function runLiveSimulation() {
+      switchTab('sim-tab');
+      document.querySelectorAll('.tab-btn')[3].classList.add('active');
+      executeSimulator();
+    }
+  </script>
+</body>
+</html>
