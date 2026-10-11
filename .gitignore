@@ -22,10 +22,11 @@ ENV/
 # Environment
 .env
 
-# Data
+# Data & Test Artifacts
 data/
 logs/
 *.db
+tests/_test_chroma*/
 
 # Docker
 postgres_data/
