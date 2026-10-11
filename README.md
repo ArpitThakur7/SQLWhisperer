@@ -1,27 +1,56 @@
+<div align="center">
+
 # 🔮 SQLWhisperer
+
+### Autonomous Natural Language to Production SQL Engine with Self-Healing, Pure-AST Validation & High-End Auto-Visualization Studio
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Architecture: 80/20](https://img.shields.io/badge/Architecture-80%2F20%20Systems%20Engineering-blueviolet)](https://github.com/sqlwhisperer/sqlwhisperer)
+[![Architecture: 80/20 Systems](https://img.shields.io/badge/Architecture-80%2F20%20Systems%20Engineering-blueviolet)](https://github.com/sqlwhisperer/sqlwhisperer)
+[![Tests: 30 Passed](https://img.shields.io/badge/Tests-30%20Passed%20(100%25)-brightgreen)](https://github.com/sqlwhisperer/sqlwhisperer)
 
-**Autonomous Natural Language to Production SQL Engine with Self-Healing, Pure-AST Validation & High-End Auto-Visualization Studio.**
+<br />
 
-SQLWhisperer is an engineering-first analytics engine that converts natural language into production SQL, executes queries safely within an AST sandbox, validates database operations deterministically in `<1ms`, and automatically renders executive Plotly visualizations with instant data insights.
+<p align="center">
+  <img src="docs/images/hero_banner.jpg" alt="SQLWhisperer Auto-Visualization Studio Dashboard" width="95%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+</p>
+
+</div>
 
 ---
 
 ## ⚡ What Makes SQLWhisperer Stand Out?
 
-Most Text-to-SQL projects are fragile API wrappers that dump raw schemas into prompts and crash on complex joins. SQLWhisperer takes an **80/20 systems engineering approach**:
+Most Text-to-SQL projects on GitHub are brittle 5-line wrappers that dump raw schemas into prompts and crash on complex joins. **SQLWhisperer takes an 80/20 systems engineering approach**:
 
-- 🎨 **High-End Auto-Visualization Studio**: Automatically inspects query result shapes and renders publication-ready Plotly charts — from **KPI Scorecard Ribbons** and **Spline Area Trends** to **Hierarchical Treemaps**, **Conversion Funnels**, **2D Matrix Heatmaps**, **Choropleth Maps**, and **Outlier Box Plots**.
-- 💡 **Automated Data Insights**: Generates executive highlights (top contributors, Pareto distribution concentration, and volatility ratios) directly alongside visual charts.
-- ⚡ **Pure-AST Deterministic SQL Validator**: Uses `sqlglot` Abstract Syntax Trees to verify table/column existence, detect accidental Cartesian joins, and enforce ANSI `GROUP BY` rules in **`<1ms` consuming 0 LLM tokens**.
-- 🕸️ **Foreign Key Graph Traversal (BFS)**: Mathematically computes shortest-path join bridges (e.g. `customers` $\to$ `orders` $\to$ `order_items` $\to$ `products`), guaranteeing junction tables are never omitted.
-- 🛠️ **AST Query Optimizer**: Automatically injects safety `LIMIT` caps to prevent unbounded queries and normalizes dialect-specific functions (e.g., PostgreSQL `NOW()` $\to$ SQLite `DATETIME('now')`).
-- 🧠 **100% Free & Offline Embeddings**: Runs ChromaDB few-shot learning on CPU with built-in ONNX `all-MiniLM-L6-v2` embeddings — zero paid OpenAI API key required.
-- 🛡️ **Zero-Trust Security Sandbox**: Single-statement enforcement, strict AST read-only verification, and engine-level read-only transactions.
+* 🎨 **High-End Auto-Visualization Studio**: Automatically inspects query result shapes and renders publication-ready Plotly charts — from **KPI Scorecard Ribbons** and **Spline Area Trends** to **Hierarchical Treemaps**, **Conversion Funnels**, **2D Matrix Heatmaps**, **Choropleth Maps**, and **Outlier Box Plots**.
+* 💡 **Automated Data Insights**: Directly generates executive analytical highlights (identifying top contributors, Pareto concentration risk, and volatility spread) alongside visual charts.
+* ⚡ **Pure-AST Deterministic SQL Validator**: Uses `sqlglot` Abstract Syntax Trees to verify table/column existence against live catalogs, catch accidental Cartesian joins, and enforce ANSI `GROUP BY` rules in **`<1ms` consuming 0 LLM tokens**.
+* 🕸️ **Foreign Key Graph Traversal (BFS)**: Mathematically computes shortest-path join bridges across database schemas (e.g., `customers` $\to$ `orders` $\to$ `order_items` $\to$ `products`), guaranteeing junction tables are never omitted.
+* 🛠️ **AST Query Optimizer**: Automatically injects safety `LIMIT` caps to prevent unbounded queries and normalizes dialect-specific functions (e.g., PostgreSQL `NOW()` $\to$ SQLite `DATETIME('now')`).
+* 🧠 **100% Free & Offline Embeddings**: Runs ChromaDB few-shot learning on CPU with built-in ONNX `all-MiniLM-L6-v2` embeddings — zero paid OpenAI API key required.
+* 🛡️ **Zero-Trust Security Sandbox**: Single-statement enforcement, strict AST read-only verification, and engine-level read-only transactions.
+
+---
+
+## 📊 Visual Studio Showcase
+
+<p align="center">
+  <img src="docs/images/visualizer_showcase.jpg" alt="SQLWhisperer Multi-Format Visualization Studio" width="95%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+</p>
+
+| Visual Format | Best Used For | Interactive Studio Features |
+| :--- | :--- | :--- |
+| **KPI Scorecard Ribbon** | Single aggregated KPIs & metrics | Value formatting, percentage delta comparisons |
+| **Hierarchical Treemap** | Multi-level category & volume breakdowns | Color-scaled nested rectangles, zoomable levels |
+| **2D Density Heatmap** | Cross-tabulated categorical matrices | Continuous contrast scale, density labels |
+| **Stage Funnel** | Lifecycle pipelines & conversion dropoffs | Stage progression percentages, custom connectors |
+| **Geographic Choropleth** | Country & regional distribution | Global land contours, interactive country hover |
+| **Spline Area & Multi-Line** | Temporal trends & growth over time | Automatic peak annotations, rolling moving averages |
+| **Donut with Center Stats** | Discrete categorical composition (<7 slices) | Hole percentage metrics, hover slice shares |
+| **Ranked Horizontal Bar** | Entity rankings & leaderboards | Auto-sorted values, direct numeric badges |
+| **Distribution Box Plot** | Value spread & statistical outlier detection | Quartile whiskers, outlier point plotting |
 
 ---
 
@@ -66,19 +95,19 @@ User Question
 
 ---
 
-## 📊 Supported Visualizations
+## 🔌 Decoupled Backend & Interactive API
 
-| Visual Format | Best Used For | Interactive Studio Features |
-| :--- | :--- | :--- |
-| **KPI Scorecard Ribbon** | Single aggregated KPIs & metrics | Value formatting, percentage delta comparisons |
-| **Hierarchical Treemap** | Multi-level category & volume breakdowns | Color-scaled nested rectangles, zoomable levels |
-| **2D Density Heatmap** | Cross-tabulated categorical matrices | Continuous contrast scale, density labels |
-| **Stage Funnel** | Lifecycle pipelines & conversion dropoffs | Stage progression percentages, custom connectors |
-| **Geographic Choropleth** | Country & regional distribution | Global land contours, interactive country hover |
-| **Spline Area & Multi-Line** | Temporal trends & growth over time | Automatic peak annotations, rolling moving averages |
-| **Donut with Center Stats** | Discrete categorical composition (<7 slices) | Hole percentage metrics, hover slice shares |
-| **Ranked Horizontal Bar** | Entity rankings & leaderboards | Auto-sorted values, direct numeric badges |
-| **Distribution Box Plot** | Value spread & statistical outlier detection | Quartile whiskers, outlier point plotting |
+SQLWhisperer features a high-performance **FastAPI** backend supporting both standard synchronous JSON requests and **Server-Sent Events (SSE)** for real-time progress streaming:
+
+<p align="center">
+  <img src="docs/images/fastapi_docs.png" alt="FastAPI Interactive OpenAPI Documentation" width="90%" style="border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" />
+</p>
+
+- `POST /api/v1/query`: Core natural language query endpoint with semantic caching.
+- `POST /api/v1/query/stream`: Real-time Server-Sent Events (SSE) streaming with stage diagnostics.
+- `GET /api/v1/health`: Live system health, engine dialect, and database status.
+- `GET /api/v1/history`: Persisted query history with latency and confidence metrics.
+- `POST /api/v1/db/test`: Database connection tester and schema inspector.
 
 ---
 
@@ -109,7 +138,7 @@ run.bat
    ```bash
    cp .env.example .env
    ```
-   *Tip: SQLWhisperer works out of the box with **Groq** (100% free high-speed inference) or local **Ollama**.*
+   *Tip: SQLWhisperer works out of the box with **Groq** (100% free high-speed cloud inference) or local **Ollama**.*
 
 3. **Start Services**:
    ```bash
@@ -128,7 +157,7 @@ Then open:
 
 ## 🧪 Testing
 
-SQLWhisperer includes a comprehensive unit and integration test suite:
+SQLWhisperer includes a comprehensive unit and integration test suite (30 tests):
 ```bash
 python -m pytest tests/
 ```
