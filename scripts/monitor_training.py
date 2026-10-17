@@ -51,6 +51,8 @@ def main():
     print("    (Press Ctrl+C to exit monitor at any time — training keeps running!)")
     print("=" * 70)
 
+    last_printed_status = ""
+
     while True:
         if not log_file or not log_file.exists():
             log_file = find_latest_log()
@@ -62,17 +64,24 @@ def main():
             with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
                 f.seek(0, os.SEEK_END)
                 size = f.tell()
-                f.seek(max(0, size - 15000), os.SEEK_SET)
+                f.seek(max(0, size - 20000), os.SEEK_SET)
                 chunk = f.read()
 
             lines = [l.strip() for l in chunk.splitlines() if l.strip()]
 
-            # 1. Check for ModelSafetensors Download progress
-            dl_matches = re.findall(r"model\.safetensors:\s*(\d+)%\|.*?\|\s*([\d\.]+[MGK]?B?)/([\d\.]+[MGK]?B?)\s*\[(.*?)[<,](.*?)\]", chunk)
+            # 1. Check for TenSecondProgressCallback line format:
+            # e.g.: [21:58:30] [=======-----------------] 26.7% | Step  40/150 | Loss: 0.8124 | Elapsed: 0:03:12 | ETA: 0:08:48
+            callback_matches = re.findall(
+                r"\[\d{2}:\d{2}:\d{2}\]\s*(\[[=\-]+\]\s*[\d\.]+% \| Step\s*\d+/\d+.*)",
+                chunk
+            )
 
-            # 2. Check for Training Step progress
-            train_matches = re.findall(r"\{\s*'loss':\s*([\d\.]+).*?'step':\s*(\d+)", chunk)
+            # 2. Check for tqdm step progress (fallback)
             step_progress = re.findall(r"(\d+)%\|.*?\|\s*(\d+)/(\d+)\s*\[(.*?)[<,](.*?)\]", chunk)
+            train_matches = re.findall(r"\{\s*'loss':\s*([\d\.]+).*?'step':\s*(\d+)", chunk)
+
+            # 3. Check for ModelSafetensors Download progress
+            dl_matches = re.findall(r"model\.safetensors:\s*(\d+)%\|.*?\|\s*([\d\.]+[MGK]?B?)/([\d\.]+[MGK]?B?)\s*\[(.*?)[<,](.*?)\]", chunk)
 
             now_str = datetime.datetime.now().strftime("%H:%M:%S")
 
@@ -80,22 +89,36 @@ def main():
                 print(f"[{now_str}] [+] TRAINING COMPLETE! LoRA Adapter saved in models/sqlwhisperer-slm-lora/!")
                 break
 
+            elif callback_matches:
+                latest_cb = callback_matches[-1]
+                if latest_cb != last_printed_status:
+                    last_printed_status = latest_cb
+                    print(f"[{now_str}] {latest_cb}")
+
             elif step_progress and "Training" in chunk:
                 pct, step, total_steps, elapsed, rate = step_progress[-1]
-                p_val = float(pct)
-                bar = render_progress_bar(p_val)
-                loss_str = f"Loss: {train_matches[-1][0]}" if train_matches else "Computing..."
-                print(f"[{now_str}] [Phase 2: GPU Training] [{bar}] Step {step}/{total_steps} ({p_val:.1f}%) | {loss_str} | {rate.strip()}")
+                status_key = f"step_{step}_{pct}"
+                if status_key != last_printed_status:
+                    last_printed_status = status_key
+                    p_val = float(pct)
+                    bar = render_progress_bar(p_val)
+                    loss_str = f"Loss: {train_matches[-1][0]}" if train_matches else "Computing..."
+                    print(f"[{now_str}] [Phase 2: GPU Training] [{bar}] Step {step}/{total_steps} ({p_val:.1f}%) | {loss_str} | {rate.strip()}")
 
             elif dl_matches:
                 pct, current, total, elapsed, rate = dl_matches[-1]
-                p_val = float(pct)
-                bar = render_progress_bar(p_val)
-                print(f"[{now_str}] [Phase 1: Downloading Base Model] [{bar}] {p_val:>5.1f}% | {current}/{total} | {rate.strip()}")
+                status_key = f"dl_{pct}"
+                if status_key != last_printed_status:
+                    last_printed_status = status_key
+                    p_val = float(pct)
+                    bar = render_progress_bar(p_val)
+                    print(f"[{now_str}] [Phase 1: Downloading Base Model] [{bar}] {p_val:>5.1f}% | {current}/{total} | {rate.strip()}")
 
             elif lines:
-                last_line = lines[-1][:75]
-                print(f"[{now_str}] [*] {last_line}")
+                last_line = lines[-1][:80]
+                if last_line != last_printed_status:
+                    last_printed_status = last_line
+                    print(f"[{now_str}] [*] {last_line}")
 
         except Exception:
             pass

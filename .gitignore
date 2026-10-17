@@ -41,6 +41,10 @@ PROJECT_NOTES.md
 postgres_data/
 redis_data/
 
+# Outputs & Models
+outputs_test/
+models/*/checkpoints/
+
 # OS
 .DS_Store
 Thumbs.db

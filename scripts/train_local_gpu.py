@@ -53,14 +53,19 @@ def main():
 
     try:
         from datasets import load_dataset
+        import datasets
+        import transformers.utils.logging
+        datasets.disable_progress_bar()
+        transformers.utils.logging.disable_progress_bar()
+
         from transformers import (
             AutoModelForCausalLM,
             AutoTokenizer,
             BitsAndBytesConfig,
-            TrainingArguments,
+            TrainerCallback,
         )
         from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-        from trl import SFTTrainer
+        from trl import SFTTrainer, SFTConfig
     except ImportError as e:
         print(f"\n[!] Missing fine-tuning packages: {e}")
         print("    Install them with:")
@@ -98,7 +103,7 @@ def main():
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_compute_dtype=torch.bfloat16,
         bnb_4bit_use_double_quant=True,
     )
 
@@ -107,11 +112,13 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    print(f"[*] Loading base model in 4-bit NF4...")
+    print(f"[*] Loading base model in 4-bit NF4 directly into RTX 4050...")
     model = AutoModelForCausalLM.from_pretrained(
         model_source,
         quantization_config=bnb_config,
-        device_map="auto",
+        device_map={"": 0},
+        dtype=torch.bfloat16,
+        low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
 
@@ -146,19 +153,72 @@ def main():
         val_dataset = load_dataset("json", data_files=str(VAL_PATH), split="train")
         val_dataset = val_dataset.map(format_chatml, batched=True)
 
-    # 5. Training Arguments (optimized for 6GB VRAM)
-    training_args = TrainingArguments(
+    # 5. Non-Flooding 10-Second Progress Callback
+    import datetime
+    import time
+
+    class TenSecondProgressCallback(TrainerCallback):
+        """Displays progress strictly every 10 seconds to eliminate terminal flooding."""
+        def __init__(self, total_steps: int):
+            self.total_steps = total_steps
+            self.last_print_time = 0.0
+            self.start_time = None
+
+        def on_train_begin(self, args, state, control, **kwargs):
+            self.start_time = time.time()
+            self.last_print_time = self.start_time
+            print(f"\n[*] Training launched on RTX 4050: {self.total_steps} total steps.")
+            print(f"[*] Showing progress updates every 10 seconds (no flooding)...\n")
+            sys.stdout.flush()
+
+        def on_step_end(self, args, state, control, **kwargs):
+            current_time = time.time()
+            step = state.global_step
+            # Trigger every 10 seconds, on step 1, or on the final step
+            if (current_time - self.last_print_time >= 10.0) or (step == 1) or (step >= self.total_steps):
+                self.last_print_time = current_time
+                elapsed = current_time - self.start_time if self.start_time else 0
+                pct = (step / self.total_steps) * 100 if self.total_steps else 0.0
+
+                if step > 0:
+                    sec_per_step = elapsed / step
+                    rem_sec = max(0, (self.total_steps - step) * sec_per_step)
+                    eta_str = str(datetime.timedelta(seconds=int(rem_sec)))
+                else:
+                    eta_str = "--:--"
+
+                elapsed_str = str(datetime.timedelta(seconds=int(elapsed)))
+
+                bar_len = 25
+                filled = int(bar_len * (pct / 100))
+                bar = "=" * filled + "-" * (bar_len - filled)
+
+                loss_str = "Loss: ----"
+                if state.log_history:
+                    for entry in reversed(state.log_history):
+                        if "loss" in entry:
+                            loss_str = f"Loss: {entry['loss']:.4f}"
+                            break
+
+                now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                print(f"[{now_str}] [{bar}] {pct:5.1f}% | Step {step:>3}/{self.total_steps} | {loss_str} | Elapsed: {elapsed_str} | ETA: {eta_str}")
+                sys.stdout.flush()
+
+    # 6. Training Arguments (BF16 native on RTX 4050, 10s non-flooding progress)
+    training_args = SFTConfig(
         output_dir=str(OUTPUT_DIR / "checkpoints"),
+        dataset_text_field="text",
+        max_length=max_seq_length,
         per_device_train_batch_size=1,       # 1 sample per step to save VRAM
         gradient_accumulation_steps=8,       # Effective batch size = 8
         warmup_steps=10,
         max_steps=max_steps,
         learning_rate=2e-4,
-        fp16=True,
-        bf16=False,
+        fp16=False,
+        bf16=True,                           # Native BF16 on Ada Lovelace RTX 4050 (avoids GradScaler)
         logging_steps=10,
-        eval_strategy="steps" if val_dataset else "no",
-        eval_steps=40 if val_dataset else None,
+        disable_tqdm=True,                   # Suppresses 1-second high frequency tqdm flooding
+        eval_strategy="no",
         optim="paged_adamw_8bit",            # Paged 8-bit optimizer uses minimal VRAM
         lr_scheduler_type="cosine",
         save_strategy="steps",
@@ -170,12 +230,11 @@ def main():
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=dataset,
         eval_dataset=val_dataset,
-        dataset_text_field="text",
-        max_seq_length=max_seq_length,
         args=training_args,
+        callbacks=[TenSecondProgressCallback(total_steps=max_steps)],
     )
 
     print("\n[+] Starting Local Fine-Tuning on RTX 4050...")
