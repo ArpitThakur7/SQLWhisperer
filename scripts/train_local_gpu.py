@@ -15,8 +15,19 @@ from __future__ import annotations
 
 import os
 import sys
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from pathlib import Path
 import torch
+
+# Compatibility polyfill: PyTorch 2.6.0 with Transformers 5.x
+if not hasattr(torch, "float8_e8m0fnu"):
+    setattr(torch, "float8_e8m0fnu", getattr(torch, "float8_e4m3fn", torch.uint8))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = BASE_DIR / "data" / "training_datasets" / "slm_prepared" / "train_slm_curated.jsonl"
@@ -62,7 +73,7 @@ def main():
     max_steps = int(os.getenv("TRAIN_STEPS", "150"))  # ~15 min on RTX 4050
 
     print("=" * 65)
-    print(f"🔮 SQLWhisperer Local GPU Training on {torch.cuda.get_device_name(0)}")
+    print(f"[*] SQLWhisperer Local GPU Training on {torch.cuda.get_device_name(0)}")
     print(f"   Base Model:     {model_id}")
     print(f"   Dataset:        {DATA_PATH}")
     print(f"   Max Seq Length: {max_seq_length}")
@@ -167,13 +178,13 @@ def main():
         args=training_args,
     )
 
-    print("\n🚀 Starting Local Fine-Tuning on RTX 4050...")
+    print("\n[+] Starting Local Fine-Tuning on RTX 4050...")
     trainer.train()
 
     print(f"\n[+] Saving fine-tuned LoRA adapter to: {OUTPUT_DIR}...")
     model.save_pretrained(str(OUTPUT_DIR))
     tokenizer.save_pretrained(str(OUTPUT_DIR))
-    print("✅ Local Fine-Tuning Complete!")
+    print("[+] Local Fine-Tuning Complete!")
 
 
 if __name__ == "__main__":
