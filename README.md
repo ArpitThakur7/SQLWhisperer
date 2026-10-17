@@ -8,7 +8,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Architecture: 80/20 Systems](https://img.shields.io/badge/Architecture-80%2F20%20Systems%20Engineering-blueviolet)](https://github.com/ArpitThakur7/SQLWhisperer)
-[![Tests: 83 Passed](https://img.shields.io/badge/Tests-83%20Passed%20(100%25)-brightgreen)](https://github.com/ArpitThakur7/SQLWhisperer)
+[![Tests: 86 Passed](https://img.shields.io/badge/Tests-86%20Passed%20(100%25)-brightgreen)](https://github.com/ArpitThakur7/SQLWhisperer)
 
 <br />
 
@@ -24,6 +24,8 @@
 
 Most Text-to-SQL projects on GitHub are brittle 5-line wrappers that dump raw schemas into prompts and crash on complex joins. **SQLWhisperer takes an 80/20 systems engineering approach**:
 
+* 📐 **Automatic Schema ERD Rendering**: Live interactive Graphviz topology mapping database tables, column types, primary keys (🔑), and foreign key link bridges (🔗) right inside the Web Studio.
+* 🌐 **Multi-DB Federation (DuckDB)**: In-memory virtual engine executing cross-database joins across disjoint SQLite databases, PostgreSQL instances, and analytical files simultaneously.
 * ⚡ **Distributed Redis Caching & Rate Limiting**: Multi-tier exact hash cache and Redis Sorted Set (ZSET) sliding-window rate limiter with sub-millisecond lookups, surviving server restarts and synchronizing across multiple API workers (with automatic, zero-overhead fallback to local in-memory caching when running without Redis).
 * 🎨 **High-End Auto-Visualization Studio**: Automatically inspects query result shapes and renders publication-ready Plotly charts — from **KPI Scorecard Ribbons** and **Spline Area Trends** to **Hierarchical Treemaps**, **Conversion Funnels**, **2D Matrix Heatmaps**, **Choropleth Maps**, and **Outlier Box Plots**, complete with an interactive Studio Controls Toolbar for real-time chart type and axis overrides.
 * 💡 **Automated Data Insights**: Directly generates executive analytical highlights (identifying top contributors, Pareto concentration risk, and volatility spread) alongside visual charts.
@@ -204,11 +206,13 @@ Then open:
 
 ## 🧪 Testing
 
-SQLWhisperer includes a comprehensive unit and integration test suite (**83/83 tests passing**):
+SQLWhisperer includes a comprehensive unit and integration test suite (**86/86 tests passing**):
 ```bash
 python -m pytest tests/
 ```
 Tests cover:
+- Automatic Schema ERD generation (Graphviz DOT syntax, PK/FK links)
+- Multi-DB Federation engine queries via in-memory DuckDB
 - Distributed Redis caching, TTL expiration, and graceful in-memory fallback
 - Redis ZSET sliding-window rate limiting & multi-client isolation
 - Pure-AST validation & security sandbox enforcement

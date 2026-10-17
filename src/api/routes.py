@@ -387,3 +387,45 @@ async def upload_database_file(file: UploadFile = File(...)):
     except Exception as exc:
         logger.error(f"Upload failed: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── ERD Graph & Multi-DB Federation Endpoints ────────────────────
+@router.get("/db/erd")
+async def get_schema_erd_endpoint(database_url: str | None = None):
+    """Generate dynamic Graphviz ERD diagram for the current database schema."""
+    try:
+        from src.visualization.erd_generator import generate_schema_erd
+        erd = generate_schema_erd(database_url.strip() if database_url else None)
+        return erd
+    except Exception as exc:
+        logger.exception(f"Failed to generate ERD: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/federation/catalogs")
+async def get_federated_catalogs():
+    """List all attached database catalogs in DuckDB federation engine."""
+    try:
+        from src.db.federation import federator
+        return {
+            "catalogs": federator.list_attached(),
+            "status": "ready",
+        }
+    except Exception as exc:
+        logger.exception(f"Federation catalog error: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/federation/query")
+async def run_federated_query(request: dict):
+    """Execute a federated cross-database query across attached catalogs."""
+    try:
+        from src.db.federation import federator
+        sql = request.get("sql", "")
+        max_rows = request.get("max_rows", 100)
+        if not sql:
+            raise HTTPException(status_code=400, detail="Missing 'sql' query parameter.")
+        return federator.query(sql, max_rows=max_rows)
+    except Exception as exc:
+        logger.exception(f"Federated query failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))

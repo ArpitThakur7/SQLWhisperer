@@ -549,7 +549,13 @@ with st.sidebar:
 
 # ── Main Tabs: Chat Interface, History & Architecture Visualizer ──
 
-tab_chat, tab_history, tab_arch = st.tabs(["💬 Query Assistant", "📜 Query History", "🏛️ System Architecture Visualizer"])
+tab_chat, tab_erd, tab_federation, tab_history, tab_arch = st.tabs([
+    "💬 Query Assistant",
+    "📐 Schema ERD",
+    "🌐 Multi-DB Federation",
+    "📜 Query History",
+    "🏛️ System Architecture Visualizer",
+])
 
 with tab_chat:
     st.markdown(
@@ -575,6 +581,66 @@ with tab_chat:
                 render_result(msg["result"], key_suffix=idx)
             else:
                 st.markdown(msg["content"])
+
+with tab_erd:
+    st.markdown("### 📐 Interactive Entity-Relationship Diagram (ERD)")
+    st.caption("Visual database schema topology mapping tables, column data types, primary keys (🔑), and foreign key link bridges (🔗).")
+
+    col_erd1, col_erd2 = st.columns([6, 2])
+    with col_erd2:
+        if st.button("🔄 Refresh ERD", key="btn_refresh_erd", use_container_width=True):
+            st.rerun()
+
+    erd_params = {"database_url": st.session_state.custom_db_url} if st.session_state.custom_db_url else {}
+    erd_res = api_request("GET", "/db/erd", params=erd_params)
+    if erd_res and "dot" in erd_res:
+        em1, em2, em3 = st.columns(3)
+        em1.metric("Tables Mapped", erd_res.get("table_count", 0))
+        em2.metric("FK Relationships", erd_res.get("relationship_count", 0))
+        em3.metric("Renderer", "Graphviz DOT")
+
+        st.graphviz_chart(erd_res["dot"], use_container_width=True)
+
+        if erd_res.get("relationships"):
+            with st.expander("🔗 Discovered Foreign Key Link Bridges"):
+                st.dataframe(
+                    [
+                        {
+                            "Source Table": r["from_table"],
+                            "Foreign Key": r["from_column"],
+                            "Target Table": r["to_table"],
+                            "Primary Key": r["to_column"],
+                        }
+                        for r in erd_res["relationships"]
+                    ],
+                    use_container_width=True,
+                )
+    else:
+        st.info("Loading or unable to generate ERD. Make sure database connection is active.")
+
+with tab_federation:
+    st.markdown("### 🌐 Multi-Database Federation (DuckDB)")
+    st.caption("Execute simultaneous cross-database queries across multiple disjoint catalogs (e.g. SQLite demo DB, history audit, and external files) in an in-memory DuckDB virtual engine.")
+
+    cat_res = api_request("GET", "/federation/catalogs")
+    if cat_res and "catalogs" in cat_res:
+        st.markdown("**Attached Virtual Catalogs:**")
+        cat_items = list(cat_res["catalogs"].items())
+        cols = st.columns(max(1, len(cat_items)))
+        for i, (cat_name, cat_tables) in enumerate(cat_items):
+            cols[i % len(cols)].info(f"📁 **{cat_name}** ({len(cat_tables)} tables)\n`{', '.join(cat_tables[:4])}`")
+
+    fed_sql_default = "SELECT p.name, p.category, p.price\nFROM ecommerce.products p\nORDER BY p.price DESC\nLIMIT 5;"
+    fed_sql = st.text_area("Federated SQL Query", value=fed_sql_default, height=120)
+
+    if st.button("⚡ Run Federated Query", key="btn_run_fed"):
+        with st.spinner("Executing federated query across catalogs..."):
+            fed_result = api_request("POST", "/federation/query", json={"sql": fed_sql, "max_rows": 100})
+            if fed_result and "results" in fed_result:
+                st.success(f"Execution: {fed_result.get('execution_time_ms', 0)}ms | Rows: {fed_result.get('row_count', 0)}")
+                st.dataframe(fed_result["results"], use_container_width=True)
+            else:
+                st.error("Federated query execution failed.")
 
 with tab_history:
     st.markdown("### 📜 Past Query Runs & Audit Log")
@@ -629,19 +695,42 @@ if active_prompt:
         with st.chat_message("user"):
             st.markdown(active_prompt)
 
-        # 2. Assistant execution
+        # 2. Assistant execution with live SSE stage streaming
         with st.chat_message("assistant"):
-            with st.spinner("🔮 Introspecting schema & executing query..."):
-                payload = {
-                    "question": active_prompt,
-                    "database_url": st.session_state.custom_db_url,
-                    "llm_provider": getattr(st.session_state, "selected_provider", "openai"),
-                    "model": getattr(st.session_state, "selected_model", ""),
-                }
-                if st.session_state.custom_api_key:
-                    payload["api_key"] = st.session_state.custom_api_key
+            payload = {
+                "question": active_prompt,
+                "database_url": st.session_state.custom_db_url,
+                "llm_provider": getattr(st.session_state, "selected_provider", "openai"),
+                "model": getattr(st.session_state, "selected_model", ""),
+            }
+            if st.session_state.custom_api_key:
+                payload["api_key"] = st.session_state.custom_api_key
 
-                response = api_request("POST", "/query", json=payload)
+            response = None
+            with st.status("🔮 Running self-healing query pipeline...", expanded=True) as status_box:
+                try:
+                    import httpx
+                    stream_url = f"{API_BASE_URL}/query/stream"
+                    with httpx.Client(timeout=45.0) as client:
+                        with client.stream("POST", stream_url, json=payload) as r:
+                            for raw_line in r.iter_lines():
+                                if raw_line.startswith("data: "):
+                                    event = json.loads(raw_line[6:])
+                                    stage = event.get("stage", "")
+                                    msg = event.get("message", "")
+                                    if stage == "complete":
+                                        response = event.get("result")
+                                        status_box.update(label="✅ Query Complete!", state="complete", expanded=False)
+                                    elif stage == "cache_hit":
+                                        status_box.update(label="⚡ Instant Cache Hit", state="complete", expanded=False)
+                                    elif stage == "error":
+                                        status_box.update(label=f"❌ Error: {event.get('error', msg)}", state="error")
+                                    else:
+                                        status_box.write(f"• **{stage.capitalize()}**: {msg}")
+                except Exception as stream_err:
+                    status_box.write(f"Streaming fallback: {stream_err}")
+                    response = api_request("POST", "/query", json=payload)
+                    status_box.update(label="✅ Query Complete", state="complete", expanded=False)
 
             if response:
                 st.session_state.messages.append({"role": "assistant", "result": response})

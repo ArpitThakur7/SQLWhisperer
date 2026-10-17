@@ -648,11 +648,14 @@ timeline
       Open-Source Governance : MIT License, CI Workflow, pyproject.toml
       Free LLM Providers : Groq, Gemini 2.0 Flash, Ollama, OpenRouter
       CLI & Analytics UX : Terminal CLI, Schema Explorer, Auto-Charting, CSV Export
-    section Upcoming Enhancements
+    section Milestone 7-8 (Complete)
+      Distributed Caching : Redis Tier 1 query & schema caching + ZSET rate limiter
       Graph Visualization : Automatic Schema ERD rendering in Streamlit
-      Async Streaming : Token-by-token explanation streaming via SSE / WebSockets
-      Multi-DB Federation : Querying across PostgreSQL + SQLite simultaneously via DuckDB
+      Async Streaming : Live pipeline stage streaming via SSE in Streamlit UI
+      Multi-DB Federation : Querying across SQLite + PostgreSQL simultaneously via DuckDB
+    section Upcoming Enhancements
       Fine-Tuned Small LLM : In-house LoRA fine-tune on domain SQL generation
+      Enterprise Gateway : Multi-tenant OAuth2 authentication & audit retention
 ```
 
 ---
