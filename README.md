@@ -7,8 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Architecture: 80/20 Systems](https://img.shields.io/badge/Architecture-80%2F20%20Systems%20Engineering-blueviolet)](https://github.com/sqlwhisperer/sqlwhisperer)
-[![Tests: 83 Passed](https://img.shields.io/badge/Tests-83%20Passed%20(100%25)-brightgreen)](https://github.com/sqlwhisperer/sqlwhisperer)
+[![Architecture: 80/20 Systems](https://img.shields.io/badge/Architecture-80%2F20%20Systems%20Engineering-blueviolet)](https://github.com/ArpitThakur7/SQLWhisperer)
+[![Tests: 83 Passed](https://img.shields.io/badge/Tests-83%20Passed%20(100%25)-brightgreen)](https://github.com/ArpitThakur7/SQLWhisperer)
 
 <br />
 
@@ -159,7 +159,7 @@ docker compose up --build
 
 1. **Clone & Install Dependencies**:
    ```bash
-   git clone https://github.com/sqlwhisperer/sqlwhisperer.git
+   git clone https://github.com/ArpitThakur7/SQLWhisperer.git
    cd sqlwhisperer
    python -m venv .venv
    source .venv/bin/activate   # On Windows: .venv\Scripts\activate

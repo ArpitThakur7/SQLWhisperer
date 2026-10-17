@@ -73,9 +73,9 @@ local-llm = [
 sqlwhisperer = "src.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/sqlwhisperer/sqlwhisperer"
-Documentation = "https://github.com/sqlwhisperer/sqlwhisperer#readme"
-Issues = "https://github.com/sqlwhisperer/sqlwhisperer/issues"
+Homepage = "https://github.com/ArpitThakur7/SQLWhisperer"
+Documentation = "https://github.com/ArpitThakur7/SQLWhisperer#readme"
+Issues = "https://github.com/ArpitThakur7/SQLWhisperer/issues"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
