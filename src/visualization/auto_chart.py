@@ -466,25 +466,65 @@ def create_plotly_figure(
     show_trendline: bool = False,
 ) -> go.Figure:
     """Generate a studio-quality Plotly figure with designer styling."""
+    if df.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Query returned 0 rows. No data to visualize.",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font=dict(size=14, color="#8B949E"),
+        )
+        fig.update_layout(**DARK_LAYOUT)
+        fig.update_layout(height=280)
+        return fig
+
     plot_df = df.copy()
-    chart_type = (override_type or rec.chart_type).lower()
-    x_col = override_x or rec.x_col
-    y_col = override_y or rec.y_col
-    title = rec.title or "Query Insights"
+    chart_type = (override_type or rec.chart_type).lower().strip()
     colors = PALETTES.get(palette_name, DEFAULT_PALETTE)
+
+    # Resolve active X and Y columns cleanly
+    all_cols = plot_df.columns.tolist()
+    num_cols = plot_df.select_dtypes(include=["number"]).columns.tolist()
+    cat_cols = [c for c in all_cols if c not in num_cols]
+
+    x_col = override_x if (override_x and override_x in plot_df.columns) else rec.x_col
+    y_col = override_y if (override_y and override_y in plot_df.columns) else rec.y_col
+
+    if not x_col or x_col not in plot_df.columns:
+        x_col = cat_cols[0] if cat_cols else (all_cols[0] if all_cols else None)
+    if not y_col or y_col not in plot_df.columns:
+        y_col = num_cols[0] if num_cols else (all_cols[-1] if all_cols else None)
+
+    # Coerce y_col to numeric if it contains numeric strings
+    if y_col and y_col in plot_df.columns:
+        if not pd.api.types.is_numeric_dtype(plot_df[y_col]):
+            converted = pd.to_numeric(plot_df[y_col], errors="coerce")
+            if converted.notna().sum() > 0:
+                plot_df[y_col] = converted.fillna(0)
+
+    title = rec.title or f"{str(y_col).replace('_', ' ').title()} Analysis"
 
     # ── 1. KPI Scorecard Card ──────────────────────────────────────
     if chart_type == "metric" and y_col and y_col in plot_df.columns:
-        val = plot_df[y_col].iloc[0]
-        label = rec.title or y_col.replace("_", " ").title()
+        is_multi_row = len(plot_df) > 1
+        if is_multi_row and pd.api.types.is_numeric_dtype(plot_df[y_col]):
+            val = float(plot_df[y_col].sum())
+            label = f"Total {y_col.replace('_', ' ').title()}"
+        else:
+            first_val = plot_df[y_col].iloc[0]
+            val = float(first_val) if isinstance(first_val, (int, float)) else 0.0
+            label = rec.title or y_col.replace("_", " ").title()
 
         fig = go.Figure()
         fig.add_trace(
             go.Indicator(
-                mode="number+delta" if len(rec.secondary_y_cols) > 0 and rec.secondary_y_cols[0] in plot_df.columns else "number",
-                value=float(val) if isinstance(val, (int, float)) else 0.0,
+                mode="number+delta" if rec.secondary_y_cols and rec.secondary_y_cols[0] in plot_df.columns else "number",
+                value=val,
                 number=dict(
-                    valueformat="," if isinstance(val, int) else ",.2f",
+                    valueformat="," if val >= 100 else ",.2f",
                     font=dict(size=56, color=colors[0]),
                 ),
                 delta=dict(
@@ -496,18 +536,33 @@ def create_plotly_figure(
             )
         )
         fig.update_layout(**DARK_LAYOUT)
-        fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
+        fig.update_layout(height=260, margin=dict(l=20, r=20, t=40, b=20))
         return fig
 
     # ── 2. Hierarchical Treemap ────────────────────────────────────
     if chart_type == "treemap":
-        path_cols = rec.hierarchy_cols if rec.hierarchy_cols and all(c in plot_df.columns for c in rec.hierarchy_cols) else [x_col] if x_col in plot_df.columns else []
-        if len(path_cols) >= 2 and y_col and y_col in plot_df.columns:
+        possible_cats = [c for c in plot_df.columns if c != y_col and not pd.api.types.is_numeric_dtype(plot_df[c])]
+        if rec.hierarchy_cols and all(c in plot_df.columns for c in rec.hierarchy_cols):
+            path_cols = [c for c in rec.hierarchy_cols if c in plot_df.columns]
+        elif len(possible_cats) >= 2 and x_col in possible_cats:
+            other_cats = [c for c in possible_cats if c != x_col]
+            path_cols = [other_cats[0], x_col]
+        elif x_col and x_col in plot_df.columns:
+            path_cols = [x_col]
+        elif possible_cats:
+            path_cols = [possible_cats[0]]
+        else:
+            path_cols = [plot_df.columns[0]]
+
+        if path_cols and y_col and y_col in plot_df.columns:
+            safe_df = plot_df.copy()
+            if pd.api.types.is_numeric_dtype(safe_df[y_col]):
+                safe_df[y_col] = safe_df[y_col].apply(lambda v: abs(float(v)) if pd.notna(v) else 0.0)
             fig = px.treemap(
-                plot_df,
+                safe_df,
                 path=path_cols,
-                values=y_col,
-                color=y_col,
+                values=y_col if pd.api.types.is_numeric_dtype(safe_df[y_col]) else None,
+                color=y_col if pd.api.types.is_numeric_dtype(safe_df[y_col]) else None,
                 color_continuous_scale=[[0, colors[1]], [0.5, colors[0]], [1, colors[2]]],
                 title=title,
             )
@@ -518,32 +573,73 @@ def create_plotly_figure(
     # ── 3. 2D Matrix Heatmap ───────────────────────────────────────
     if chart_type == "heatmap":
         if x_col and y_col and x_col in plot_df.columns and y_col in plot_df.columns:
+            possible_cats = [c for c in plot_df.columns if c != y_col and not pd.api.types.is_numeric_dtype(plot_df[c])]
             metric = rec.color_col or (rec.secondary_y_cols[0] if rec.secondary_y_cols else None)
-            if metric and metric in plot_df.columns:
+
+            # Strategy A: If we have 2 category columns + 1 measure column, build 2D pivot
+            if len(possible_cats) >= 2 and pd.api.types.is_numeric_dtype(plot_df[y_col]):
+                c1, c2 = possible_cats[0], possible_cats[1]
                 try:
-                    pivot_df = plot_df.pivot_table(index=y_col, columns=x_col, values=metric, aggfunc="sum", fill_value=0)
-                    fig = px.imshow(
-                        pivot_df,
-                        color_continuous_scale=[[0, "#161b22"], [0.5, colors[0]], [1, colors[1]]],
-                        aspect="auto",
-                        title=title,
-                        labels=dict(x=x_col, y=y_col, color=metric),
-                    )
-                    fig.update_layout(**DARK_LAYOUT)
-                    fig.update_layout(height=460)
-                    return fig
+                    pivot_df = plot_df.pivot_table(index=c1, columns=c2, values=y_col, aggfunc="sum", fill_value=0)
+                    if not pivot_df.empty:
+                        fig = px.imshow(
+                            pivot_df,
+                            color_continuous_scale=[[0, "#161b22"], [0.5, colors[0]], [1, colors[1]]],
+                            aspect="auto",
+                            title=title,
+                            labels=dict(x=c2, y=c1, color=y_col),
+                        )
+                        fig.update_layout(**DARK_LAYOUT)
+                        fig.update_layout(height=460)
+                        return fig
                 except Exception:
                     pass
+
+            # Strategy B: If metric column is available for pivot
+            if metric and metric in plot_df.columns and pd.api.types.is_numeric_dtype(plot_df[metric]):
+                try:
+                    pivot_df = plot_df.pivot_table(index=y_col, columns=x_col, values=metric, aggfunc="sum", fill_value=0)
+                    if not pivot_df.empty:
+                        fig = px.imshow(
+                            pivot_df,
+                            color_continuous_scale=[[0, "#161b22"], [0.5, colors[0]], [1, colors[1]]],
+                            aspect="auto",
+                            title=title,
+                            labels=dict(x=x_col, y=y_col, color=metric),
+                        )
+                        fig.update_layout(**DARK_LAYOUT)
+                        fig.update_layout(height=460)
+                        return fig
+                except Exception:
+                    pass
+
+            # Strategy C: Direct 1D/2D category intensity heatmap
+            try:
+                heat_df = plot_df.set_index(x_col)[[y_col]].T
+                fig = px.imshow(
+                    heat_df,
+                    color_continuous_scale=[[0, "#161b22"], [0.5, colors[0]], [1, colors[1]]],
+                    aspect="auto",
+                    title=f"{y_col.replace('_', ' ').title()} Heatmap across {x_col.replace('_', ' ').title()}",
+                    labels=dict(x=x_col, y="Metric", color=y_col),
+                )
+                fig.update_layout(**DARK_LAYOUT)
+                fig.update_layout(height=340)
+                return fig
+            except Exception:
+                pass
 
     # ── 4. Funnel Chart ────────────────────────────────────────────
     if chart_type == "funnel":
         if x_col and y_col and x_col in plot_df.columns and y_col in plot_df.columns:
+            sorted_df = plot_df.sort_values(by=y_col, ascending=False) if pd.api.types.is_numeric_dtype(plot_df[y_col]) else plot_df
+            color_seq = [colors[i % len(colors)] for i in range(len(sorted_df))]
             fig = go.Figure(
                 go.Funnel(
-                    y=plot_df[x_col],
-                    x=plot_df[y_col],
+                    y=sorted_df[x_col].astype(str),
+                    x=sorted_df[y_col],
                     textinfo="value+percent previous",
-                    marker=dict(color=colors[:len(plot_df)]),
+                    marker=dict(color=color_seq),
                     connector=dict(line=dict(color="rgba(48, 54, 61, 0.7)", width=1)),
                 )
             )
@@ -553,14 +649,19 @@ def create_plotly_figure(
 
     # ── 5. Geographic Choropleth Map ───────────────────────────────
     if chart_type == "choropleth":
-        if x_col and y_col and x_col in plot_df.columns and y_col in plot_df.columns:
+        geo_col = x_col
+        for col in plot_df.columns:
+            if any(term in col.lower() for term in ("country", "nation", "state", "geo", "region", "location")):
+                geo_col = col
+                break
+        if geo_col and y_col and geo_col in plot_df.columns and y_col in plot_df.columns:
             fig = px.choropleth(
                 plot_df,
-                locations=x_col,
+                locations=geo_col,
                 locationmode="country names",
                 color=y_col,
                 color_continuous_scale=[[0, "#161b22"], [0.5, colors[0]], [1, colors[2]]],
-                title=title,
+                title=f"{title} (Geographic Distribution)",
             )
             fig.update_layout(**DARK_LAYOUT)
             fig.update_geos(
@@ -607,14 +708,14 @@ def create_plotly_figure(
                     name=y_col.replace("_", " ").title(),
                     line=dict(color=colors[0], width=3, shape="spline"),
                     fill="tozeroy",
-                    fillcolor=f"rgba(0, 210, 255, 0.2)",
+                    fillcolor="rgba(0, 210, 255, 0.2)",
                     marker=dict(size=6, color=colors[1]),
                     hovertemplate=f"<b>%{{x}}</b><br>{y_col}: %{{y:,.2f}}<extra></extra>",
                 )
             )
 
-            # Add rolling moving average trendline if requested
-            if show_trendline and len(plot_df) >= 4:
+            # Trendline
+            if show_trendline and len(plot_df) >= 4 and pd.api.types.is_numeric_dtype(plot_df[y_col]):
                 rolling_avg = plot_df[y_col].rolling(window=min(7, len(plot_df) // 2), min_periods=1).mean()
                 fig.add_trace(
                     go.Scatter(
@@ -626,21 +727,25 @@ def create_plotly_figure(
                     )
                 )
 
-            # Auto-highlight peak value
-            max_idx = plot_df[y_col].idxmax()
-            peak_x = plot_df.loc[max_idx, x_col]
-            peak_y = plot_df.loc[max_idx, y_col]
-            fig.add_annotation(
-                x=peak_x,
-                y=peak_y,
-                text=f"Peak: {peak_y:,.0f}",
-                showarrow=True,
-                arrowhead=2,
-                arrowcolor=colors[0],
-                bgcolor="#1C2128",
-                bordercolor=colors[0],
-                font=dict(color="#F0F6FC", size=11),
-            )
+            # Auto-highlight peak value if numeric
+            if pd.api.types.is_numeric_dtype(plot_df[y_col]) and len(plot_df) > 0 and plot_df[y_col].notna().any():
+                try:
+                    max_idx = plot_df[y_col].idxmax()
+                    peak_x = plot_df.loc[max_idx, x_col]
+                    peak_y = plot_df.loc[max_idx, y_col]
+                    fig.add_annotation(
+                        x=peak_x,
+                        y=peak_y,
+                        text=f"Peak: {peak_y:,.0f}" if isinstance(peak_y, (int, float)) and peak_y >= 100 else f"Peak: {peak_y}",
+                        showarrow=True,
+                        arrowhead=2,
+                        arrowcolor=colors[0],
+                        bgcolor="#1C2128",
+                        bordercolor=colors[0],
+                        font=dict(color="#F0F6FC", size=11),
+                    )
+                except Exception:
+                    pass
 
             fig.update_layout(**DARK_LAYOUT)
             fig.update_layout(title=dict(text=title), height=430)
@@ -668,8 +773,8 @@ def create_plotly_figure(
                 )
             )
 
-            for idx, sec_col in enumerate(rec.secondary_y_cols[:3]):
-                if sec_col in plot_df.columns:
+            for idx, sec_col in enumerate(rec.secondary_y_cols[:3] if rec.secondary_y_cols else []):
+                if sec_col in plot_df.columns and sec_col != y_col:
                     col_color = colors[(idx + 1) % len(colors)]
                     fig.add_trace(
                         go.Scatter(
@@ -683,7 +788,7 @@ def create_plotly_figure(
                         )
                     )
 
-            if show_trendline and len(plot_df) >= 4:
+            if show_trendline and len(plot_df) >= 4 and pd.api.types.is_numeric_dtype(plot_df[y_col]):
                 rolling_avg = plot_df[y_col].rolling(window=min(7, len(plot_df) // 2), min_periods=1).mean()
                 fig.add_trace(
                     go.Scatter(
@@ -702,22 +807,22 @@ def create_plotly_figure(
     # ── 9. Donut / Pie Chart ───────────────────────────────────────
     if chart_type == "pie":
         if x_col and y_col and x_col in plot_df.columns and y_col in plot_df.columns:
-            total_sum = plot_df[y_col].sum()
+            total_sum = plot_df[y_col].sum() if pd.api.types.is_numeric_dtype(plot_df[y_col]) else len(plot_df)
+            color_seq = [colors[i % len(colors)] for i in range(len(plot_df))]
             fig = go.Figure(
                 data=[
                     go.Pie(
-                        labels=plot_df[x_col],
+                        labels=plot_df[x_col].astype(str),
                         values=plot_df[y_col],
                         hole=0.58,
-                        marker=dict(colors=colors),
+                        marker=dict(colors=color_seq),
                         textinfo="label+percent",
                         hovertemplate="<b>%{label}</b><br>Value: %{value:,.2f}<br>Share: %{percent}<extra></extra>",
                     )
                 ]
             )
-            # Center total annotation
             fig.add_annotation(
-                text=f"Total<br><b>{total_sum:,.0f}</b>",
+                text=f"Total<br><b>{total_sum:,.0f}</b>" if isinstance(total_sum, (int, float)) and total_sum >= 100 else f"Total<br><b>{total_sum}</b>",
                 showarrow=False,
                 font=dict(size=14, color="#E6EDF3"),
             )
@@ -738,74 +843,74 @@ def create_plotly_figure(
                 size=size_arg,
                 color=color_arg,
                 color_discrete_sequence=colors,
-                trendline="ols" if show_trendline else None,
                 title=title,
                 hover_data=plot_df.columns.tolist()[:5],
             )
-            fig.update_traces(marker=dict(opacity=0.85, line=dict(width=1, color="rgba(255,255,255,0.4)")))
+            fig.update_traces(marker=dict(size=9, opacity=0.85, line=dict(width=1, color="rgba(255,255,255,0.4)")))
             fig.update_layout(**DARK_LAYOUT)
             fig.update_layout(height=440)
             return fig
 
     # ── 11. Bar Chart (Horizontal & Vertical with Value Annotations)
-    if x_col and y_col and x_col in plot_df.columns and y_col in plot_df.columns:
-        is_horiz = rec.is_horizontal
+    if chart_type == "bar" or (x_col and y_col and x_col in plot_df.columns and y_col in plot_df.columns):
+        if x_col and y_col and x_col in plot_df.columns and y_col in plot_df.columns:
+            is_horiz = getattr(rec, "is_horizontal", False) or (plot_df[x_col].nunique() > 10)
 
-        if is_horiz:
-            fig = go.Figure()
-            fig.add_trace(
-                go.Bar(
-                    y=plot_df[x_col],
-                    x=plot_df[y_col],
-                    orientation="h",
-                    name=y_col.replace("_", " ").title(),
-                    marker=dict(
-                        color=colors[0],
-                        line=dict(color=colors[1], width=1),
-                    ),
-                    text=plot_df[y_col].apply(lambda v: f"{v:,.0f}" if isinstance(v, (int, float)) else str(v)),
-                    textposition="auto",
-                    hovertemplate=f"<b>%{{y}}</b><br>{y_col}: %{{x:,.2f}}<extra></extra>",
-                )
-            )
-            fig.update_layout(**DARK_LAYOUT)
-            fig.update_layout(
-                title=dict(text=title),
-                height=max(400, min(800, len(plot_df) * 28 + 120)),
-                yaxis=dict(autorange="reversed"),
-            )
-            return fig
-        else:
-            fig = go.Figure()
-            fig.add_trace(
-                go.Bar(
-                    x=plot_df[x_col],
-                    y=plot_df[y_col],
-                    name=y_col.replace("_", " ").title(),
-                    marker=dict(
-                        color=colors[0],
-                        line=dict(color=colors[1], width=1),
-                    ),
-                    text=plot_df[y_col].apply(lambda v: f"{v:,.0f}" if isinstance(v, (int, float)) else str(v)),
-                    textposition="auto",
-                    hovertemplate=f"<b>%{{x}}</b><br>{y_col}: %{{y:,.2f}}<extra></extra>",
-                )
-            )
-            for idx, sec_col in enumerate(rec.secondary_y_cols[:2]):
-                if sec_col in plot_df.columns:
-                    sec_color = colors[(idx + 1) % len(colors)]
-                    fig.add_trace(
-                        go.Bar(
-                            x=plot_df[x_col],
-                            y=plot_df[sec_col],
-                            name=sec_col.replace("_", " ").title(),
-                            marker=dict(color=sec_color),
-                            hovertemplate=f"<b>%{{x}}</b><br>{sec_col}: %{{y:,.2f}}<extra></extra>",
-                        )
+            if is_horiz:
+                fig = go.Figure()
+                fig.add_trace(
+                    go.Bar(
+                        y=plot_df[x_col].astype(str),
+                        x=plot_df[y_col],
+                        orientation="h",
+                        name=y_col.replace("_", " ").title(),
+                        marker=dict(
+                            color=colors[0],
+                            line=dict(color=colors[1], width=1),
+                        ),
+                        text=plot_df[y_col].apply(lambda v: f"{v:,.0f}" if isinstance(v, (int, float)) and v >= 100 else (f"{v:,.2f}" if isinstance(v, float) else str(v))),
+                        textposition="auto",
+                        hovertemplate=f"<b>%{{y}}</b><br>{y_col}: %{{x:,.2f}}<extra></extra>",
                     )
-            fig.update_layout(**DARK_LAYOUT)
-            fig.update_layout(title=dict(text=title), barmode="group", height=430)
-            return fig
+                )
+                fig.update_layout(**DARK_LAYOUT)
+                fig.update_layout(
+                    title=dict(text=title),
+                    height=max(400, min(800, len(plot_df) * 28 + 120)),
+                    yaxis=dict(autorange="reversed"),
+                )
+                return fig
+            else:
+                fig = go.Figure()
+                fig.add_trace(
+                    go.Bar(
+                        x=plot_df[x_col].astype(str),
+                        y=plot_df[y_col],
+                        name=y_col.replace("_", " ").title(),
+                        marker=dict(
+                            color=colors[0],
+                            line=dict(color=colors[1], width=1),
+                        ),
+                        text=plot_df[y_col].apply(lambda v: f"{v:,.0f}" if isinstance(v, (int, float)) and v >= 100 else (f"{v:,.2f}" if isinstance(v, float) else str(v))),
+                        textposition="auto",
+                        hovertemplate=f"<b>%{{x}}</b><br>{y_col}: %{{y:,.2f}}<extra></extra>",
+                    )
+                )
+                for idx, sec_col in enumerate(rec.secondary_y_cols[:2] if rec.secondary_y_cols else []):
+                    if sec_col in plot_df.columns and sec_col != y_col:
+                        sec_color = colors[(idx + 1) % len(colors)]
+                        fig.add_trace(
+                            go.Bar(
+                                x=plot_df[x_col].astype(str),
+                                y=plot_df[sec_col],
+                                name=sec_col.replace("_", " ").title(),
+                                marker=dict(color=sec_color),
+                                hovertemplate=f"<b>%{{x}}</b><br>{sec_col}: %{{y:,.2f}}<extra></extra>",
+                            )
+                        )
+                fig.update_layout(**DARK_LAYOUT)
+                fig.update_layout(title=dict(text=title), barmode="group", height=430)
+                return fig
 
     # Default fallback: numeric bars
     num_cols = plot_df.select_dtypes(include=["number"]).columns.tolist()

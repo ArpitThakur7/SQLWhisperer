@@ -27,6 +27,8 @@ data/
 logs/
 *.db
 tests/_test_chroma*/
+scratch/
+PROJECT_NOTES.md
 
 # Docker
 postgres_data/

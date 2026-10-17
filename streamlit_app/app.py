@@ -4,6 +4,7 @@ Provides direct in-browser database connection management, schema inspection,
 model selection, auto-charting, and conversational SQL querying.
 """
 
+import hashlib
 import os
 from pathlib import Path
 import httpx
@@ -129,8 +130,18 @@ def api_request(method: str, endpoint: str, **kwargs) -> dict | list | None:
 # ── Result Renderer ───────────────────────────────────────────────
 
 
-def render_result(result: dict) -> None:
+def render_result(result: dict, key_suffix: str | int | None = None) -> None:
     """Render metrics, generated SQL, interactive tables/charts, and summaries."""
+    # Deterministic result ID for persistent widget states
+    qid = result.get("query_id")
+    if key_suffix is not None:
+        ruid = f"s{key_suffix}_{qid or '0'}"
+    elif qid:
+        ruid = f"qid_{qid}"
+    else:
+        q_raw = f"{result.get('question', '')}|{result.get('sql', '')}|{result.get('row_count', 0)}"
+        ruid = f"h_{hashlib.md5(q_raw.encode('utf-8')).hexdigest()[:10]}"
+
     # 1. Performance & Confidence Metrics
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Rows", result.get("row_count", 0))
@@ -158,7 +169,7 @@ def render_result(result: dict) -> None:
                 data=csv_bytes,
                 file_name="sqlwhisperer_query_results.csv",
                 mime="text/csv",
-                key=f"dl_{result.get('query_id', id(df))}",
+                key=f"dl_{ruid}",
             )
 
         with tab_chart:
@@ -217,7 +228,7 @@ def render_result(result: dict) -> None:
                         chosen_chart = st.selectbox(
                             "📊 Chart Type",
                             chart_options,
-                            key=f"ctype_{id(df)}",
+                            key=f"ctype_{ruid}",
                         )
                         x_default_idx = (
                             all_cols.index(rec.x_col)
@@ -228,7 +239,7 @@ def render_result(result: dict) -> None:
                             "X-Axis / Category",
                             all_cols,
                             index=x_default_idx if all_cols else 0,
-                            key=f"cx_{id(df)}",
+                            key=f"cx_{ruid}",
                         )
                         y_choices = num_cols if num_cols else all_cols
                         y_default_idx = (
@@ -240,17 +251,17 @@ def render_result(result: dict) -> None:
                             "Y-Axis / Measure",
                             y_choices,
                             index=y_default_idx if y_choices else 0,
-                            key=f"cy_{id(df)}",
+                            key=f"cy_{ruid}",
                         )
                         chosen_palette = st.selectbox(
                             "Theme Palette",
                             list(PALETTES.keys()),
-                            key=f"pal_{id(df)}",
+                            key=f"pal_{ruid}",
                         )
                         show_trend = st.checkbox(
                             "📈 Show Trendline / Moving Avg",
                             value=False,
-                            key=f"trend_{id(df)}",
+                            key=f"trend_{ruid}",
                         )
 
                 # Determine effective parameters
@@ -296,7 +307,7 @@ def render_result(result: dict) -> None:
                         data=html_bytes,
                         file_name="sqlwhisperer_chart.html",
                         mime="text/html",
-                        key=f"html_dl_{id(df)}",
+                        key=f"html_dl_{ruid}",
                     )
                 except Exception as chart_err:
                     st.warning(f"Could not render visual: {chart_err}")
@@ -541,10 +552,10 @@ with tab_chat:
     )
 
     # Display existing messages
-    for msg in st.session_state.messages:
+    for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             if msg["role"] == "assistant" and "result" in msg:
-                render_result(msg["result"])
+                render_result(msg["result"], key_suffix=idx)
             else:
                 st.markdown(msg["content"])
 
@@ -616,8 +627,8 @@ if active_prompt:
                 response = api_request("POST", "/query", json=payload)
 
             if response:
-                render_result(response)
                 st.session_state.messages.append({"role": "assistant", "result": response})
+                render_result(response, key_suffix=len(st.session_state.messages) - 1)
 
                 # Feedback buttons
                 qid = response.get("query_id")
