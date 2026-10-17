@@ -33,22 +33,37 @@ Most Text-to-SQL projects on GitHub are brittle 5-line wrappers that dump raw sc
 * 🧠 **100% Free & Offline Embeddings**: Runs ChromaDB few-shot learning on CPU with built-in ONNX `all-MiniLM-L6-v2` embeddings — zero paid OpenAI API key required.
 * 🛡️ **Zero-Trust Security Sandbox**: Single-statement enforcement, strict AST read-only verification, and engine-level read-only transactions.
 
-## 🖥️ Live Streamlit Studio & Interactive Workspace
+## 🖥️ Live Studio & Interactive Workspace
 
-SQLWhisperer provides a sleek, dark-mode Web Studio designed for both business analysts and engineers:
+SQLWhisperer provides a sleek, dark-mode Web Studio designed for business analysts, data teams, and engineers alike:
+
+### 1. Natural Language to SQL & Live Schema Explorer
+Ask questions in everyday English — SQLWhisperer handles complex multi-table joins, filters, and aggregations while letting you inspect your live database catalog in real time:
 
 <p align="center">
-  <img src="docs/images/streamlit_ui.png" alt="SQLWhisperer Live Interface with Sidebar Schema Explorer & Health Indicator" width="95%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+  <img src="docs/images/streamlit_query_execution.png" alt="SQLWhisperer Live Query Execution with Schema Explorer and Metric Cards" width="95%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
 </p>
 
 * 🔌 **Dynamic Database Switcher**: Toggle seamlessly between the embedded demo SQLite dataset, custom PostgreSQL/MySQL connection strings, or drag-and-drop SQLite file uploads.
-* 📂 **Live Schema Explorer**: Expand tables in the sidebar to inspect column types, primary keys, and real-time row counts without manual queries.
+* 📂 **Live Schema Explorer**: Expand tables in the sidebar to inspect column types, primary keys, and real-time row counts without writing manual `PRAGMA` or `INFORMATION_SCHEMA` queries.
+* ⚡ **Live Performance & Confidence Metrics**: Instant transparency into row counts, sub-millisecond execution times, confidence percentages, and self-healing retry counts.
 * 🤖 **Multi-Provider AI Hot-Swapping**: Switch models across Groq (Llama 3.3 70B), Google Gemini (Gemini 2.0 Flash), local Ollama (100% offline), OpenRouter, and OpenAI directly from the sidebar.
-* ⚡ **Live Health & Cache Indicator**: Immediate visibility into database dialect connection and Redis/In-Memory cache status (`🟢 Connected • ⚡ Redis Active` / `🧠 In-Memory Cache`).
+
+### 2. Auto-Chart Studio & Key Analytical Highlights
+The engine automatically detects the optimal visual representation for your query results and extracts executive highlights:
+
+<p align="center">
+  <img src="docs/images/streamlit_chart_studio.png" alt="SQLWhisperer Auto-Chart Studio with KPI Metric Ribbon and Key Analytical Highlights" width="95%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+</p>
+
+* 📊 **Executive Metric Ribbons**: Aggregates sum totals ($\Sigma$), averages ($\mu$), peak values ($\uparrow$), and total rows analyzed ($N$) at a glance.
+* 📈 **Interactive Plotly Visualizations**: Hover inspection, zoom, pan, and direct image export with high-contrast themes.
+* 🛠️ **Studio Controls Toolbar**: Override chart formats (Bar, Line, Area, Treemap, Funnel, Heatmap, Box Plot) and remap X/Y axes in real time.
+* 💡 **Automated Data Insights**: Instant narrative callouts identifying top contributors, Pareto concentration shares, and growth anomalies.
 
 ---
 
-## 📊 Visual Studio Showcase
+## 📊 Visual Studio Multi-Format Matrix
 
 <p align="center">
   <img src="docs/images/visualizer_showcase.jpg" alt="SQLWhisperer Multi-Format Visualization Studio" width="95%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
