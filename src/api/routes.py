@@ -36,6 +36,7 @@ from src.config.settings import settings
 from src.config.session import SessionConfig
 from src.memory.feedback import FeedbackHandler
 from src.memory.semantic_cache import SemanticQueryCache
+from src.memory.redis_client import is_redis_available
 
 router = APIRouter(prefix="/api/v1", tags=["queries"])
 
@@ -215,9 +216,12 @@ async def get_history(limit: int = 20):
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint for Docker / load balancer probes."""
+    redis_up = is_redis_available()
     return HealthResponse(
         dialect=get_dialect_name(),
         llm_provider=settings.llm_provider,
+        redis_connected=redis_up,
+        cache_backend="redis" if redis_up else "memory",
     )
 
 

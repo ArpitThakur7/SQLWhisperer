@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     chroma_persist_dir: str = "./data/chroma"
     chroma_collection_name: str = "few_shot_examples"
 
+    # ── Redis Cache & Distributed Rate Limiting ───────────────────
+    redis_url: str = "redis://localhost:6379/0"
+    redis_cache_ttl_seconds: int = 3600
+    redis_enabled: bool = True
+
     # ── Chain Config ──────────────────────────────────────────────
     max_refinement_retries: int = 3
     max_result_rows: int = 100

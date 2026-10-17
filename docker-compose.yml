@@ -19,6 +19,20 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Redis (Query Cache & Distributed Rate Limiting) ───────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # ── FastAPI Backend ───────────────────────────────────────────
   api:
     build:
@@ -30,12 +44,15 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
       - DATABASE_URL=postgresql://sqlwhisperer:${POSTGRES_PASSWORD:-localdev123}@postgres:5432/sqlwhisperer
+      - REDIS_URL=redis://redis:6379/0
       - HISTORY_DB_URL=sqlite:///./data/query_history.db
       - CHROMA_PERSIST_DIR=./data/chroma
     volumes:
       - app_data:/app/data
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/v1/health').raise_for_status()"]
@@ -59,4 +76,5 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   app_data:

@@ -58,6 +58,8 @@ class HealthResponse(BaseModel):
     version: str = "0.1.0"
     dialect: str = "SQLite"
     llm_provider: str = "openai"
+    redis_connected: bool = False
+    cache_backend: str = "memory"
 
 
 class ColumnInfo(BaseModel):

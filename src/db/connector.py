@@ -10,11 +10,15 @@ mutating global settings.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import threading
 from pathlib import Path
+from typing import Any
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from src.config.settings import settings
+from src.memory.redis_client import get_redis_client
 from loguru import logger
 
 # Paths
@@ -89,7 +93,7 @@ def get_engine(database_url: str | None = None) -> Engine:
 def invalidate_engine(database_url: str | None = None) -> None:
     """Remove a cached engine (e.g. when the user switches databases).
 
-    If *database_url* is ``None``, clears the entire cache.
+    If *database_url* is ``None``, clears the entire cache across memory and Redis.
     """
     with _engine_lock:
         if database_url:
@@ -97,11 +101,26 @@ def invalidate_engine(database_url: str | None = None) -> None:
             _schema_cache.pop(database_url, None)
             if engine:
                 engine.dispose()
+            r_client = get_redis_client()
+            if r_client:
+                try:
+                    h = hashlib.sha256(database_url.strip().encode("utf-8")).hexdigest()
+                    r_client.delete(f"sqlwhisperer:schema:{h}")
+                except Exception:
+                    pass
         else:
             for eng in _engine_cache.values():
                 eng.dispose()
             _engine_cache.clear()
             _schema_cache.clear()
+            r_client = get_redis_client()
+            if r_client:
+                try:
+                    keys = list(r_client.scan_iter(match="sqlwhisperer:schema:*"))
+                    if keys:
+                        r_client.delete(*keys)
+                except Exception:
+                    pass
 
 
 def get_dialect_name(database_url: str | None = None) -> str:
@@ -200,12 +219,36 @@ def get_table_info(tables: list[str] | None = None, database_url: str | None = N
 
 
 def get_schema_metadata(database_url: str | None = None) -> dict[str, dict[str, Any]]:
-    """Return structured schema metadata (tables, column sets, PKs, FKs) with caching."""
+    """Return structured schema metadata (tables, column sets, PKs, FKs) with multi-tier caching."""
     db_url = (database_url or settings.database_url).strip()
 
     with _engine_lock:
         if db_url in _schema_cache:
             return _schema_cache[db_url]
+
+    # Check Redis cache
+    r_client = get_redis_client()
+    url_hash = hashlib.sha256(db_url.encode("utf-8")).hexdigest()
+    redis_key = f"sqlwhisperer:schema:{url_hash}"
+
+    if r_client:
+        try:
+            raw = r_client.get(redis_key)
+            if raw:
+                cached_data = json.loads(raw)
+                metadata: dict[str, dict[str, Any]] = {
+                    table: {
+                        "columns": set(info.get("columns", [])),
+                        "primary_keys": set(info.get("primary_keys", [])),
+                        "foreign_keys": info.get("foreign_keys", []),
+                    }
+                    for table, info in cached_data.items()
+                }
+                with _engine_lock:
+                    _schema_cache[db_url] = metadata
+                return metadata
+        except Exception as exc:
+            logger.debug(f"Redis schema cache read failed: {exc}")
 
     engine = get_engine(database_url)
     inspector = inspect(engine)
@@ -237,5 +280,20 @@ def get_schema_metadata(database_url: str | None = None) -> dict[str, dict[str, 
 
     with _engine_lock:
         _schema_cache[db_url] = metadata
+
+    if r_client:
+        try:
+            serialized = {
+                table: {
+                    "columns": list(info["columns"]),
+                    "primary_keys": list(info["primary_keys"]),
+                    "foreign_keys": info["foreign_keys"],
+                }
+                for table, info in metadata.items()
+            }
+            # Cache schema metadata in Redis for 30 minutes
+            r_client.set(redis_key, json.dumps(serialized), ex=1800)
+        except Exception as exc:
+            logger.debug(f"Redis schema cache save failed: {exc}")
 
     return metadata

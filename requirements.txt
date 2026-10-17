@@ -11,8 +11,9 @@ openai>=1.50.0
 sqlalchemy>=2.0
 psycopg2-binary>=2.9
 
-# Vector Store
+# Vector Store & Caching
 chromadb>=0.5.0
+redis>=5.0.0
 
 # API
 fastapi>=0.115.0

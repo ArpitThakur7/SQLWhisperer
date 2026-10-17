@@ -352,7 +352,8 @@ with st.sidebar:
     # API Status check
     health = api_request("GET", "/health")
     if health:
-        st.success(f"🟢 Connected ({health.get('dialect', 'Auto')})")
+        cache_badge = "⚡ Redis Active" if health.get("redis_connected") else "🧠 In-Memory Cache"
+        st.success(f"🟢 Connected ({health.get('dialect', 'Auto')}) • {cache_badge}")
     else:
         st.error("🔴 API Offline — Start with `run.bat` or `uvicorn src.api.app:app`")
 
