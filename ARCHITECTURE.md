@@ -25,6 +25,9 @@
    - [3.6 Adaptive Vector Memory & Feedback Loop](#36-adaptive-vector-memory--feedback-loop)
    - [3.7 Multi-Dialect Database & Persistence Tier](#37-multi-dialect-database--persistence-tier)
    - [3.8 Pluggable Multi-LLM Provider Engine](#38-pluggable-multi-llm-provider-engine)
+   - [3.9 Automatic Schema ERD & Relational Graph Visualizer](#39-automatic-schema-erd--relational-graph-visualizer)
+   - [3.10 Multi-Database Virtual Federation Engine (DuckDB)](#310-multi-database-virtual-federation-engine-duckdb)
+   - [3.11 Distributed Redis Tier-1 Caching & Sliding-Window Rate Limiting](#311-distributed-redis-tier-1-caching--sliding-window-rate-limiting)
 4. [End-to-End Execution Flow & State Machine](#4-end-to-end-execution-flow--state-machine)
 5. [Self-Healing Refinement Loop Deep Dive](#5-self-healing-refinement-loop-deep-dive)
 6. [Security & Isolation Matrix](#6-security--isolation-matrix)
@@ -41,7 +44,10 @@
 
 * **Strict Dual-Layer Safety**: AST parsing via `sqlglot` + regex pattern interception guarantees strictly read-only `SELECT` queries with recursive mutation prevention.
 * **Autonomous Self-Healing**: Dynamic error feedback loops autonomously diagnose syntax issues, schema mismatches, and empty/suspicious data, executing up to 3 refinement iterations.
-* **Continuous Reinforcement**: Thumbs-up feedback and expert corrections are embedded directly into ChromaDB vector memory, augmenting future queries with domain-specific few-shot context.
+* **Distributed Redis Multi-Tier Cache**: Sub-millisecond exact hash caching and Redis Sorted Set (ZSET) sliding-window rate limiting with seamless zero-downtime local in-memory fallback.
+* **Continuous Reinforcement**: Thumbs-up feedback and expert corrections are embedded directly into ChromaDB vector memory with local ONNX embeddings, augmenting future queries with domain-specific few-shot context.
+* **Automatic Schema ERD Visualizer**: Live Graphviz DOT topology mapping database tables, column types, primary keys (🔑), and foreign-key link bridges (🔗) with interactive zooming and pan.
+* **Multi-DB Virtual Federation (DuckDB)**: Embedded analytical engine executing cross-database joins across disjoint SQLite databases, PostgreSQL instances, and Parquet/CSV files simultaneously.
 * **Zero-Friction Portability**: Zero-setup SQLite demo fallback with automatic synthetic data seeding alongside native enterprise PostgreSQL and custom connection strings.
 * **Model Agnostic**: Hot-swappable AI backends across Groq (Llama 3.3 70B, Qwen 2.5 Coder), Google Gemini (Gemini 2.0 Flash), Ollama (local offline models), OpenRouter, and OpenAI.
 
@@ -54,29 +60,30 @@ flowchart TB
     %% Client Tier
     subgraph Clients[" 💻 Presentation & Ingress Tier "]
         direction TB
-        StreamlitUI["🔮 Streamlit Web App\n(Dark Glassmorphism, Auto-Charts, Schema Explorer)"]
+        StreamlitUI["🔮 Streamlit Web Studio\n(Dark Glassmorphism, 3 Tabs: NL2SQL, Schema ERD, Multi-DB Federation)"]
         CLIClient["⌨️ SQLWhisperer CLI\n(Terminal Queries, CI/CD, JSON & SQL-Only)"]
         ExternalApps["🌐 External API Consumers / BI Tools"]
     end
 
-    %% API Tier
-    subgraph APIGateway[" ⚡ REST API Engine (FastAPI) "]
+    %% Ingress & Cache Tier
+    subgraph IngressGateway[" ⚡ Ingress, Caching & Rate Limiting (FastAPI & Redis) "]
         direction TB
-        FastAPIApp["FastAPI Ingress Router\n(/api/v1/query, /feedback, /history, /db/*)"]
-        SessionMgr["Session & Dynamic Config Manager\n(Runtime DB URL, LLM Provider, API Key overrides)"]
+        RateLimiter{"🛡️ Rate Limiter Middleware\n(Redis ZSET Sliding-Window: 60 req/min)"}
+        FastAPIRouter["FastAPI Ingress Router\n(/api/v1/query, /query/stream, /db/erd, /federation/*)"]
+        RedisCache[("⚡ Distributed Redis Cache\nTier 1A: Exact Query Hash (1-hr TTL)\nTier 2: Schema Catalog (30-min TTL)\nFallback: In-Memory Dict Cache")]
     end
 
     %% Orchestration Core
     subgraph CoreEngine[" 🧠 Self-Healing Orchestration Core (LangChain LCEL) "]
         direction TB
-        PipelineOrchestrator["Pipeline Orchestrator\n(Refinement Coordinator & Retry Budget)"]
+        PipelineOrchestrator["Pipeline Orchestrator\n(Refinement Coordinator & SSE Stage Streamer)"]
         
         subgraph SubChains[" Modular LCEL Chains "]
             direction LR
-            SchemaRetriever["1. Schema Retriever\n(Lightweight LLM Pruning)"]
+            SchemaRetriever["1. Schema Retriever\n(FK Graph BFS & LLM Pruning)"]
             Text2SQL["2. Text2SQL Generator\n(Dialect-Aware Synthesizer)"]
-            Validator["3. Semantic Validator\n(Pydantic AST & Logic Checker)"]
-            Executor["4. Safe DB Executor\n(sqlglot AST + Regex Guard)"]
+            Validator["3. Pure-AST Validator\n(sqlglot AST Compiler <1ms)"]
+            Executor["4. Safe DB Executor\n(sqlglot Guard + Row Capping)"]
             Inspector["5. Result Inspector\n(Sanity & Quality Evaluator)"]
             Explainer["6. Business Explainer\n(Non-technical Summary)"]
         end
@@ -85,37 +92,48 @@ flowchart TB
     %% Semantic & Memory
     subgraph Intelligence[" 📚 Semantic & Context Engine "]
         direction TB
-        Glossary["Semantic Glossary\n(config/glossary.yaml: Metrics & Business Rules)"]
-        ChromaStore["ChromaDB Vector Store\n(Semantic Few-Shot Memory & Embeddings)"]
+        Glossary["Semantic Glossary\n(config/glossary.yaml: Metrics & Rules)"]
+        ChromaStore["ChromaDB Vector Store\n(Local ONNX all-MiniLM-L6-v2 Embeddings)"]
         FeedbackEngine["Feedback Handler\n(Adaptive Learning from Thumbs-Up/Edits)"]
+    end
+
+    %% Visualization Tier
+    subgraph VizEngine[" 🎨 Visualization & Topology Engine "]
+        direction TB
+        AutoChartStudio["📊 Auto-Visualization Studio\n(9 Plotly Formats: Treemap, Funnel, Heatmap, etc.)"]
+        ERDGenerator["📐 Schema ERD Generator\n(Graphviz DOT & Mermaid Relational Graph)"]
     end
 
     %% LLM Providers
     subgraph LLMFactory[" 🤖 Pluggable Multi-LLM Provider Engine "]
         direction TB
         FactoryRouter{"LLM Provider Factory\n(src/chains/llm_factory.py)"}
-        GroqProvider["⚡ Groq API\n(Llama 3.3 70B, Qwen 2.5 Coder)"]
-        GeminiProvider["💎 Google Gemini\n(Gemini 2.0 Flash)"]
-        OllamaProvider["🏠 Local Ollama\n(Offline Qwen/DeepSeek)"]
-        OpenRouter["🔀 OpenRouter\n(Community Free/Paid)"]
-        OpenAIProvider["🧠 OpenAI\n(GPT-4o, GPT-4o-mini)"]
+        GroqProvider["⚡ Groq API (Llama 3.3 70B, Qwen 2.5 Coder)"]
+        GeminiProvider["💎 Google Gemini (Gemini 2.0 Flash)"]
+        OllamaProvider["🏠 Local Ollama (Offline Qwen/DeepSeek)"]
+        OpenRouter["🔀 OpenRouter (Community Free/Paid)"]
+        OpenAIProvider["🧠 OpenAI (GPT-4o, GPT-4o-mini)"]
     end
 
-    %% Data & Persistence
-    subgraph Storage[" 🗄️ Multi-Dialect & Persistence Layer "]
+    %% Data & Federation Tier
+    subgraph Storage[" 🗄️ Multi-Dialect & Virtual Federation Tier "]
         direction TB
         DBConnector["Dynamic Database Connector\n(SQLAlchemy Engine + Dialect Normalizer)"]
-        PrimaryDB[("Target Relational DB\nPostgreSQL / SQLite / MySQL / DuckDB")]
+        DuckDBFederator["🌐 DuckDB Multi-DB Federation Engine\n(Cross-Database In-Memory Virtual Joins)"]
+        PrimaryDB[("Target Relational DB\nPostgreSQL / SQLite / MySQL")]
         DemoSQLite[("Zero-Setup Demo SQLite\ndata/demo_ecommerce.db")]
         AuditHistory[("Query Audit SQLite DB\nlogs/query_history.db")]
     end
 
-    %% Top Level Connections
-    StreamlitUI --> FastAPIApp
+    %% Ingress Connections
+    StreamlitUI --> RateLimiter
     CLIClient --> CoreEngine
-    ExternalApps --> FastAPIApp
-    FastAPIApp --> SessionMgr
-    SessionMgr --> PipelineOrchestrator
+    ExternalApps --> RateLimiter
+    RateLimiter --> FastAPIRouter
+    FastAPIRouter <--> RedisCache
+    FastAPIRouter --> PipelineOrchestrator
+    FastAPIRouter --> ERDGenerator
+    FastAPIRouter --> DuckDBFederator
 
     %% Core Pipeline Workflow
     PipelineOrchestrator --> SchemaRetriever
@@ -127,6 +145,7 @@ flowchart TB
     Validator --> Executor
     Executor --> Inspector
     Inspector --> Explainer
+    Explainer --> AutoChartStudio
 
     %% Feedback & Self Healing Loops
     Inspector -.->|Refinement Loop on Failure| Text2SQL
@@ -154,6 +173,9 @@ flowchart TB
     DBConnector --> PrimaryDB
     DBConnector -.->|Auto Fallback if unreachable| DemoSQLite
     PipelineOrchestrator --> AuditHistory
+    DuckDBFederator -.->|Virtual Attach| PrimaryDB
+    DuckDBFederator -.->|Virtual Attach| DemoSQLite
+    ERDGenerator -.-> DBConnector
 ```
 
 ---
@@ -163,10 +185,13 @@ flowchart TB
 ### 3.1 Presentation & Interface Tier
 * **Streamlit Web Application (`streamlit_app/app.py`)**:
   - **Aesthetic**: Premium dark glassmorphism theme (`#0d0b21` to `#1e1b4b`), custom CSS tokens, metric badges, and interactive feedback widgets.
+  - **Tabbed Experience**:
+    1. **🔍 NL to SQL & Auto-Charts**: Natural language query input, real-time Server-Sent Events (SSE) stage streaming with `st.status()`, SQL syntax highlighting, interactive Plotly visualization studio with 9 format presets, KPI scorecard ribbons, and key analytical insight callouts.
+    2. **📐 Schema ERD**: Interactive Graphviz DOT entity-relationship diagram with zoom/pan controls, primary key (🔑) flags, and foreign key relationship bridges (🔗).
+    3. **🌐 Multi-DB Federation**: In-memory DuckDB querying across multiple attached databases (e.g. joining SQLite demo tables with uploaded datasets or PostgreSQL catalogs).
   - **Interactive Database Management**: Instant switching between embedded demo SQLite, local SQLite upload via drag-and-drop, or custom PostgreSQL/MySQL connection strings.
   - **Live Schema Explorer**: Real-time schema viewer displaying column types, primary key flags, nullability, row counts, and live 3-row data samples.
   - **In-Browser Model & Key Switcher**: Ability to toggle between Groq, Gemini, Ollama, OpenRouter, and OpenAI with runtime key injection.
-  - **Analytics & Auto-Charting**: Automatic detection of categorical + numeric columns producing instant Bar, Line, or Area charts with 1-click CSV download.
 * **Terminal CLI (`src/cli/main.py`)**:
   - `sqlwhisperer query "<question>"`: Direct terminal queries with rich ANSI formatted tables.
   - `--sql-only`: Output strictly raw SQL (ideal for piping into `psql`, `sqlite3`, or Bash scripts).
@@ -177,17 +202,23 @@ flowchart TB
 ---
 
 ### 3.2 API & Ingress Service Tier
-Built with **FastAPI** (`src/api/app.py`, `src/api/routes.py`), providing an asynchronous, typed REST API adhering to OpenAPI specifications:
+Built with **FastAPI** (`src/api/app.py`, `src/api/routes.py`), providing an asynchronous, typed REST API adhering to OpenAPI specifications with integrated rate limiting and caching:
 
 | Endpoint | Method | Input Schema | Response Schema | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| `/api/v1/query` | `POST` | `QueryRequest` | `QueryResponse` | Runs natural language to SQL through the self-healing pipeline |
+| `/api/v1/query` | `POST` | `QueryRequest` | `QueryResponse` | Runs natural language to SQL through multi-tier cache & self-healing pipeline |
+| `/api/v1/query/stream` | `POST` | `QueryRequest` | `text/event-stream` | Server-Sent Events (SSE) real-time streaming of pipeline stages and latency |
 | `/api/v1/feedback` | `POST` | `FeedbackRequest` | `FeedbackResponse` | Submits thumbs up/down and user-corrected SQL to memory |
 | `/api/v1/history` | `GET` | `limit: int = 20` | `list[HistoryItem]` | Retrieves chronological audit trail of executed queries |
-| `/api/v1/health` | `GET` | None | `HealthResponse` | Liveness and readiness probe with dialect diagnostics |
+| `/api/v1/health` | `GET` | None | `HealthResponse` | Liveness/readiness probe, Redis status, dialect, and active LLM |
 | `/api/v1/db/test` | `POST` | `DatabaseConnectRequest` | `DatabaseTestResponse` | Validates target database URL and returns discovered tables |
 | `/api/v1/db/schema`| `GET` | `database_url: str?` | `list[TableSchemaInfo]` | Full DDL reflection, column metadata, and sample rows |
 | `/api/v1/db/upload`| `POST` | `UploadFile (.db)` | `dict` | Accepts SQLite database uploads and stores in `data/user_uploads/` |
+| `/api/v1/db/erd` | `GET` | `database_url: str?` | `dict` | Generates Graphviz DOT schema topology and relationship links |
+| `/api/v1/federation/catalogs` | `GET` | None | `dict` | Lists all attached database catalogs and tables in DuckDB engine |
+| `/api/v1/federation/query` | `POST` | `{'sql': str, 'max_rows': int}` | `dict` | Executes cross-database federated SQL query via DuckDB |
+
+---
 
 ---
 
@@ -338,6 +369,104 @@ Centralized in `src/chains/llm_factory.py`, decoupling business logic from any s
 
 ---
 
+### 3.9 Automatic Schema ERD & Relational Graph Visualizer
+Implemented in `src/visualization/erd_generator.py` and exposed via `/api/v1/db/erd`:
+
+```mermaid
+flowchart LR
+    TargetDB[("Target Database\nPostgreSQL / SQLite / MySQL")] --> Inspector["SQLAlchemy Inspector\n(reflects tables, columns, PKs, FKs)"]
+    Inspector --> TopologyEngine["ERD Topology Engine\n(builds node structs & edge bridges)"]
+    TopologyEngine --> GraphvizDOT["Graphviz DOT Generator\n(dark-mode HTML-like records)"]
+    GraphvizDOT --> WebStudio["Streamlit '📐 Schema ERD' Tab\n(Interactive canvas, zoom, pan)"]
+```
+
+* **Dynamic Catalog Introspection**: Queries database metadata via SQLAlchemy Inspector to extract:
+  - Table entities and exact database column types (`VARCHAR`, `INTEGER`, `TIMESTAMP`, `DECIMAL`).
+  - Primary key constraints (`🔑` icon badges).
+  - Foreign key link definitions (`from_table`, `from_column`, `referred_table`, `referred_column`).
+* **Publication-Quality Graphviz Rendering**:
+  - Synthesizes dark-themed Graphviz DOT definitions with rounded node borders (`#6366f1`), header gradients (`#1e1b4b`), and contrasting column rows (`#0f172a`).
+  - Draws directed relation edges (`->`) bridging foreign key origins to referenced primary keys with `[color="#818cf8", penwidth=2.0, arrowhead="crow"]`.
+* **Zero-Setup Client Visualization**: Rendered automatically inside the Streamlit Web Studio via `st.graphviz_chart()` without requiring client-side Graphviz binaries.
+
+---
+
+### 3.10 Multi-Database Virtual Federation Engine (DuckDB)
+Implemented in `src/db/federation.py` and exposed via `/api/v1/federation/catalogs` and `/api/v1/federation/query`:
+
+```mermaid
+flowchart TB
+    subgraph DuckDBSandbox[" 🌐 In-Memory DuckDB Virtual Session (:memory:) "]
+        direction TB
+        FederatorCore["DuckDB Federation Broker\n(src/db/federation.py)"]
+        AttachedCatalogs["Attached Virtual Schemas\n(ecommerce.*, history.*, user_data.*)"]
+        FederatedOptimizer["Vectorized Execution & Join Optimizer"]
+    end
+
+    subgraph DataSources[" Disparate Data Sources "]
+        direction LR
+        SQLiteDemo[("Demo E-Commerce DB\n(data/demo_ecommerce.db)")]
+        SQLiteUploads[("User Uploaded DBs\n(data/user_uploads/*.db)")]
+        AuditDB[("Query History Audit DB\n(logs/query_history.db)")]
+        ExternalPostgres[("External PostgreSQL / Parquet / CSV")]
+    end
+
+    DataSources -->|ATTACH ... (TYPE SQLITE)| FederatorCore
+    FederatorCore --> AttachedCatalogs
+    AttachedCatalogs --> FederatedOptimizer
+    FederatedOptimizer --> VirtualResult["⚡ Unified Tabular Results\n(Cross-database JOINs in <5ms)"]
+```
+
+* **Virtual Zero-Copy Catalog Attachment**:
+  - Leverages DuckDB's native SQLite extension to attach multiple distinct database files into a single virtual memory workspace using `ATTACH '{db_path}' AS {alias} (TYPE SQLITE);`.
+  - Automatically mounts default catalogs on startup: `ecommerce` (500 customers, 2,000 orders) and `history` (query audit ledger).
+* **Cross-Database Unified Queries**:
+  - Enables data analysts to execute federated SQL joining tables across physically separated database files in a single query:
+    ```sql
+    SELECT c.name, c.email, COUNT(h.id) AS query_executions
+    FROM ecommerce.customers c
+    JOIN history.query_history h ON c.id = h.id
+    GROUP BY c.name, c.email
+    ORDER BY query_executions DESC
+    LIMIT 5;
+    ```
+* **Performance & Safety Isolation**:
+  - In-memory vectorized execution engine processes analytical queries at sub-millisecond latencies without touching the host database files.
+  - Implements strict query timeouts and result capping (`max_rows = 100`).
+
+---
+
+### 3.11 Distributed Redis Tier-1 Caching & Sliding-Window Rate Limiting
+Implemented in `src/memory/redis_client.py`, `src/memory/semantic_cache.py`, and `src/api/rate_limiter.py`:
+
+```mermaid
+flowchart LR
+    IncomingReq["Incoming HTTP / CLI Request"] --> RateLimiter{"Redis ZSET Rate Limiter\n(60 req/min sliding window)"}
+    
+    RateLimiter -- Exceeded (HTTP 429) --> Rejection["❌ 429 Rate Limit Exceeded"]
+    RateLimiter -- Allowed --> CacheLookup{"Redis Tier 1A Exact Cache\nKey: SHA-256(question + db_url)"}
+    
+    CacheLookup -- Cache Hit (<1ms) --> CachedResponse["⚡ Instant Cached QueryResponse\n(0 LLM tokens, 0 DB queries)"]
+    CacheLookup -- Cache Miss --> LCELPipeline["🧠 Full LangChain LCEL Pipeline"]
+    
+    LCELPipeline --> SaveCache["Write to Redis Tier 1A (TTL: 1 Hour)\n+ Update In-Memory Tier 1B"]
+    SaveCache --> FinalResponse["✅ Generated QueryResponse"]
+```
+
+* **Multi-Tier Query & Catalog Caching**:
+  - **Tier 1A (Distributed Redis Query Cache)**: Deterministic SHA-256 hash keying `sqlwhisperer:query_cache:<hash(question + db_url)>` stores serialized query responses (`sql`, `results`, `explanation`, `latency`) with a 1-hour TTL.
+  - **Tier 1B (In-Memory Fallback Cache)**: If Redis is not running or offline, queries transparently resolve against an in-memory thread-safe dictionary with LRU eviction.
+  - **Tier 2 (Schema Metadata Cache)**: Caches DDL column definitions and primary/foreign key reflection (`sqlwhisperer:schema_cache:<hash(db_url)>`) for 30 minutes, eliminating repetitive database introspection overhead.
+* **Sliding-Window Rate Limiting with Redis Sorted Sets (ZSET)**:
+  - Tracks client request frequencies per IP or session API token across distributed FastAPI worker processes:
+    1. Removes timestamps older than the 60-second sliding window: `ZREMRANGEBYSCORE key 0 (now - 60)`.
+    2. Counts current requests: `ZCARD key`.
+    3. If count $\ge 60$, rejects with `429 Too Many Requests` and returns `X-RateLimit-Retry-After` header.
+    4. If count $< 60$, inserts current microsecond timestamp: `ZADD key now now` and sets `EXPIRE key 60`.
+  - Transparent in-memory fallback maintains sliding window accuracy in local standalone environments.
+
+---
+
 ## 4. End-to-End Execution Flow & State Machine
 
 ```mermaid
@@ -467,6 +596,9 @@ When an attempt fails at any stage (validation, database execution, or sanity in
 | **Data Mutation (`DELETE`/`UPDATE`/`DROP`)** | AST tree-walking inspects all sub-nodes; regex hard blocklist rejects mutation verbs | Dual layer (`sqlglot` + Regex pattern) |
 | **Sensitive Table Exposure** | `settings.blocked_tables` enforces exclusion via AST table token inspection | AST node inspection & Regex fallback |
 | **Denial of Service (Runaway Queries)** | Configurable `QUERY_TIMEOUT_SECONDS` (15s default) terminates long executions | SQLAlchemy engine connection args |
+| **API Abuse & Runaway Loops** | Redis Sorted Set (ZSET) sliding-window rate limiter (60 req/min per client IP/key) | `src/api/rate_limiter.py` (FastAPI middleware) |
+| **Path Traversal Attacks** | Destination sanitization strips relative path markers from uploaded `.db` files | `src/api/routes.py` (`/api/v1/db/upload`) |
+| **Cross-Database Virtual Isolation** | DuckDB in-memory session executes isolated read-only queries across attached files | `src/db/federation.py` (DuckDB engine) |
 | **Memory Exhaustion (OOM)** | Strict `MAX_RESULT_ROWS` (100 default) limits row fetch and payload serialization | Execution chain slicing |
 | **Credential Security** | Sensitive keys configured via `.env` or session memory, never logged to stdout | `src/config/settings.py` (Pydantic) |
 | **Container Privilege Escalation** | Multi-stage Docker containers running under unprivileged non-root users (`appuser`) | `Dockerfile.api`, `Dockerfile.streamlit` |
@@ -564,39 +696,50 @@ Sql_bot/
 ├── src/                          # Application Core Source Code
 │   ├── api/                      # REST API Layer (FastAPI)
 │   │   ├── app.py                # FastAPI app initialization, CORS, middleware
-│   │   └── routes.py             # Route handlers (/query, /feedback, /db/*)
+│   │   ├── rate_limiter.py       # Redis ZSET sliding-window rate limiter
+│   │   └── routes.py             # Route handlers (/query, /stream, /erd, /federation)
 │   ├── chains/                   # LangChain LCEL Pipelines & Self-Healing
 │   │   ├── executor.py           # Safe DB executor with sqlglot AST parsing
 │   │   ├── explainer.py          # Business summary generator
 │   │   ├── inspector.py          # Result sanity & data quality auditor
 │   │   ├── llm_factory.py        # Multi-provider LLM factory (Groq, Gemini, Ollama...)
-│   │   ├── pipeline.py           # Self-healing refinement orchestrator
+│   │   ├── pipeline.py           # Self-healing refinement orchestrator & SSE streamer
 │   │   ├── schema_retriever.py   # Two-stage LLM table pruning & DDL reflection
 │   │   ├── text2sql.py           # Dialect-aware SQL synthesizer
-│   │   └── validator.py          # Structured SQL syntax & schema validator
+│   │   └── validator.py          # Pure-AST & structured SQL syntax validator
 │   ├── cli/                      # Command-Line Interface
 │   │   └── main.py               # sqlwhisperer CLI tool (query, health)
 │   ├── config/                   # Configuration Management
 │   │   └── settings.py           # Pydantic BaseSettings environment loader
 │   ├── db/                       # Database Abstraction & Persistence
 │   │   ├── connector.py          # Multi-dialect engine & auto SQLite fallback
+│   │   ├── federation.py         # Multi-DB DuckDB virtual federation engine
 │   │   ├── history.py            # Audit repository query history manager
 │   │   └── models.py             # SQLAlchemy ORM models for query history
-│   ├── memory/                   # Adaptive Memory & Feedback Learning
+│   ├── memory/                   # Adaptive Memory, Caching & Feedback Learning
 │   │   ├── feedback.py           # User thumbs up/down feedback handler
-│   │   └── few_shot_store.py     # ChromaDB vector store for semantic retrieval
+│   │   ├── few_shot_store.py     # ChromaDB vector store with ONNX embeddings
+│   │   ├── redis_client.py       # Distributed Redis client & health prober
+│   │   └── semantic_cache.py     # Multi-tier exact query & schema cache
 │   ├── schemas/                  # Pydantic v2 Request & Response Contracts
 │   │   ├── request.py            # QueryRequest, FeedbackRequest, DatabaseConnectRequest
 │   │   └── response.py           # QueryResponse, HistoryItem, TableSchemaInfo
 │   └── semantic/                 # Semantic Business Intelligence Layer
 │       └── glossary.py           # Dynamic business term and synonym matcher
+│   └── visualization/            # Visualization & Topology Engines
+│       ├── auto_chart.py         # Plotly auto-visualizer (9 formats + KPI ribbon)
+│       └── erd_generator.py      # Automated Graphviz DOT schema ERD generator
 ├── streamlit_app/                # Web Presentation Layer
-│   └── app.py                    # Streamlit interactive UI with auto-charting
-├── tests/                        # Automated Test Suite
+│   └── app.py                    # Streamlit interactive UI (NL2SQL, ERD, Federation)
+├── tests/                        # Automated Test Suite (86 tests)
 │   ├── test_chains/              # Unit tests for executor, validator, pipeline
-│   └── test_semantic.py          # Unit tests for semantic glossary matcher
+│   ├── test_erd_and_federation.py # Tests for Schema ERD & DuckDB federation
+│   ├── test_memory/              # Unit tests for Redis cache, fallback, and vector store
+│   ├── test_semantic.py          # Unit tests for semantic glossary matcher
+│   └── test_visualization.py     # Unit tests for auto-chart heuristics & Plotly rendering
+├── architecture_visualizer.html  # Interactive standalone HTML architecture blueprint
 ├── .env.example                  # Environment configuration template
-├── docker-compose.yml            # Multi-service container orchestration
+├── docker-compose.yml            # Multi-service container orchestration (API, UI, DB, Redis)
 ├── Dockerfile.api                # FastAPI container specification
 ├── Dockerfile.streamlit          # Streamlit UI container specification
 ├── pyproject.toml                # PEP 621 packaging & tool configs (Ruff, Pytest)
@@ -632,6 +775,21 @@ Sql_bot/
 * **Context**: Relying exclusively on paid OpenAI API keys limits community adoption and user experimentation.
 * **Decision**: Implement an LLM factory supporting **Groq** (free Llama 3.3 70B & Qwen 2.5 Coder) and **Google Gemini** free tier alongside offline **Ollama**.
 * **Outcome**: Any developer can run the entire platform at zero dollar cost.
+
+### ADR-006: In-Memory DuckDB for Virtual Multi-DB Federation
+* **Context**: Organizations frequently store datasets across multiple disjoint SQLite files, departmental databases, and analytical formats (CSV, Parquet) without a central data warehouse.
+* **Decision**: Embed an in-memory **DuckDB** virtual session capable of dynamically attaching external SQLite databases and executing cross-catalog analytical queries.
+* **Outcome**: Zero data replication or migration overhead; instant multi-database queries executed in single-digit milliseconds.
+
+### ADR-007: Distributed Redis Multi-Tier Caching with In-Memory Graceful Fallback
+* **Context**: High-traffic API environments require sub-millisecond query caching and synchronized rate limiting across multiple backend workers, but local developers should not be forced to install Redis.
+* **Decision**: Implement a multi-tier cache (`Tier 1A` Redis, `Tier 1B` in-memory) and a Redis Sorted Set (ZSET) sliding-window rate limiter with automatic, silent fallback to local in-memory storage.
+* **Outcome**: Production scalability across distributed Kubernetes pods with zero developer friction during local development.
+
+### ADR-008: Automated Graphviz DOT Schema ERD Introspection
+* **Context**: Navigating complex database schemas requires a clear visual understanding of entity relationships, primary keys, and foreign keys.
+* **Decision**: Implement dynamic SQLAlchemy catalog introspection that compiles table definitions and foreign keys directly into dark-mode Graphviz DOT graphs rendered natively via `st.graphviz_chart()`.
+* **Outcome**: Instant visual architecture exploration without third-party diagramming tools or external SaaS dependencies.
 
 ---
 

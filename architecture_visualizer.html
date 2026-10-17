@@ -616,8 +616,8 @@
           <div class="nodes-row">
             <div class="node-card" onclick="openDrawer('streamlit')">
               <div class="node-icon">🔮</div>
-              <div class="node-title">Streamlit Web App</div>
-              <div class="node-desc">Dark Glassmorphism UI, Auto-Charting (Bar/Line/Area), SQLite drag-and-drop, and Schema Explorer.</div>
+              <div class="node-title">Streamlit Web Studio</div>
+              <div class="node-desc">Dark Glassmorphism UI with 3 tabs: NL2SQL & Auto-Charts, Schema ERD, and Multi-DB Virtual Federation, with SSE streaming.</div>
               <div class="node-tags">
                 <span class="tag">streamlit_app/app.py</span>
                 <span class="tag">Port 8501</span>
@@ -638,11 +638,21 @@
             <div class="node-card" onclick="openDrawer('fastapi')">
               <div class="node-icon">⚡</div>
               <div class="node-title">FastAPI REST Gateway</div>
-              <div class="node-desc">Asynchronous endpoints for queries, thumbs feedback, audit history, and database diagnostics.</div>
+              <div class="node-desc">Asynchronous endpoints for queries, SSE streaming, thumbs feedback, ERD generation, and federation.</div>
               <div class="node-tags">
                 <span class="tag">src/api/routes.py</span>
                 <span class="tag">OpenAPI 3.1</span>
                 <span class="tag">Port 8000</span>
+              </div>
+            </div>
+
+            <div class="node-card" onclick="openDrawer('redis_cache')">
+              <div class="node-icon">⚡</div>
+              <div class="node-title">Redis Tier-1 Cache & Limiter</div>
+              <div class="node-desc">Distributed exact SHA-256 query cache & ZSET sliding-window rate limiter (60 req/min) with memory fallback.</div>
+              <div class="node-tags">
+                <span class="tag">src/memory/redis_client.py</span>
+                <span class="tag">Port 6379</span>
               </div>
             </div>
           </div>
@@ -738,6 +748,16 @@
                   <span class="tag">src/semantic/glossary.py</span>
                 </div>
               </div>
+
+              <div class="node-card" onclick="openDrawer('erd_generator')">
+                <div class="node-icon">📐</div>
+                <div class="node-title">Schema ERD Visualizer</div>
+                <div class="node-desc">Dynamic catalog introspection generating interactive Graphviz DOT ERDs with PK (🔑) and FK (🔗) relationship links.</div>
+                <div class="node-tags">
+                  <span class="tag">src/visualization/erd_generator.py</span>
+                  <span class="tag">/api/v1/db/erd</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -802,6 +822,16 @@
               <div class="node-title">Multi-LLM Factory</div>
               <div class="node-desc">Supports Groq, Gemini 2.0 Flash, Ollama, OpenRouter, and OpenAI with runtime key switching.</div>
               <div class="node-tags"><span class="tag">src/chains/llm_factory.py</span></div>
+            </div>
+
+            <div class="node-card" onclick="openDrawer('federation')">
+              <div class="node-icon">🌐</div>
+              <div class="node-title">DuckDB Multi-DB Federation</div>
+              <div class="node-desc">In-memory virtual cross-database joins across disjoint SQLite files, PostgreSQL catalogs, and analytical data formats.</div>
+              <div class="node-tags">
+                <span class="tag">src/db/federation.py</span>
+                <span class="tag">In-Memory DuckDB</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1108,6 +1138,45 @@
           "Supports OpenAI GPT-4o flagship models"
         ],
         schema: "get_chat_llm(temperature=0) -> BaseChatModel"
+      },
+      redis_cache: {
+        badge: "Caching & Ingress Tier",
+        title: "Distributed Redis Cache & ZSET Rate Limiter",
+        desc: "Multi-tier deterministic query caching and sliding-window rate limiting with seamless local in-memory fallback.",
+        path: "src/memory/redis_client.py, src/memory/semantic_cache.py, src/api/rate_limiter.py",
+        responsibilities: [
+          "Tier 1A: Exact SHA-256 query key caching with 1-hour TTL for 0ms responses",
+          "Tier 1B: Graceful zero-overhead fallback to local in-memory cache when Redis is offline",
+          "Tier 2: Database schema catalog metadata caching with 30-minute TTL",
+          "Redis Sorted Set (ZSET) sliding-window rate limiter (60 req/min per client IP/key)"
+        ],
+        schema: "QueryRequest -> Redis SHA256 Key -> Cached QueryResponse"
+      },
+      erd_generator: {
+        badge: "Visualization Tier",
+        title: "Schema ERD & Relational Graph Generator",
+        desc: "Compiles database schemas dynamically into dark-mode Graphviz DOT graphs with primary keys and foreign key bridges.",
+        path: "src/visualization/erd_generator.py",
+        responsibilities: [
+          "Inspects tables, columns, data types, and primary key constraints via SQLAlchemy",
+          "Maps directed foreign key link bridges across related tables",
+          "Synthesizes dark-themed Graphviz DOT records rendered natively in Streamlit",
+          "Powers the '📐 Schema ERD' tab in Streamlit Web Studio"
+        ],
+        schema: "get_schema_erd(database_url?) -> {'dot': str, 'relationships': list}"
+      },
+      federation: {
+        badge: "Virtual Data Tier",
+        title: "DuckDB Multi-DB Virtual Federation Engine",
+        desc: "In-memory virtual analytical session attaching disparate database files to perform cross-database SQL joins.",
+        path: "src/db/federation.py",
+        responsibilities: [
+          "Dynamically attaches external SQLite, CSV, or Parquet datasets into virtual memory",
+          "Pre-mounts default 'ecommerce' and 'history' catalogs on initial boot",
+          "Executes cross-database JOINs across physically disjoint database files",
+          "Vectorized OLAP execution with sub-millisecond analytical query speed"
+        ],
+        schema: "MultiDBFederator.query(sql: str) -> {'columns', 'rows', 'execution_time_ms'}"
       }
     };
 

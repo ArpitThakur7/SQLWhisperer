@@ -126,11 +126,20 @@ User Question
                       │  Sandboxed DB Execution     │ (Read-only transaction, timeout guard)
                       └──────────────┬──────────────┘
                                      │
-                                     ▼
-                      ┌─────────────────────────────┐
-                      │  Auto-Visualization Studio  │ (Treemap, Heatmap, Funnel, Trend, KPI)
-                      └─────────────────────────────┘
+             ┌───────────────────────┴───────────────────────┐
+             ▼                                               ▼
+┌─────────────────────────────┐               ┌─────────────────────────────┐
+│  Auto-Visualization Studio  │               │ DuckDB Multi-DB Federation  │
+│  (Treemap, Funnel, Heatmap) │               │ (Cross-database virtual OLAP│
+└────────────┬────────────────┘               └─────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────┐
+│  Schema ERD Visualizer      │ (Graphviz DOT topology with PKs & FK bridges)
+└─────────────────────────────┘
 ```
+
+> 📖 **Deep Dive**: For full sequence diagrams, state machines, and ADRs, see the comprehensive [ARCHITECTURE.md](ARCHITECTURE.md) blueprint and interactive [architecture_visualizer.html](architecture_visualizer.html).
 
 ---
 
@@ -148,6 +157,10 @@ SQLWhisperer features a high-performance **FastAPI** backend supporting both sta
 - `GET /api/v1/health`: Live system health, engine dialect, Redis status, and active LLM provider.
 - `GET /api/v1/history`: Persisted query history with latency and confidence metrics.
 - `POST /api/v1/db/test`: Database connection tester and schema inspector.
+- `GET /api/v1/db/schema`: Column DDL reflection, primary key flags, and 3-row data previews.
+- `GET /api/v1/db/erd`: Dynamic Graphviz DOT schema topology and foreign-key link visualizer.
+- `GET /api/v1/federation/catalogs`: List all attached database catalogs in the DuckDB virtual engine.
+- `POST /api/v1/federation/query`: Cross-database federated SQL querying across multiple attached databases.
 
 ---
 
