@@ -34,9 +34,26 @@ def main():
 
     # 1. Configuration
     max_seq_length = 2048
-    model_name = "unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit"
-    dataset_path = "train_chatml.jsonl" if os.path.isfile("train_chatml.jsonl") else "data/training_datasets/train_chatml.jsonl"
-    output_model_dir = "sqlwhisperer-coder-7b-q4"
+    # Recommended models: 7B (best accuracy), 3B (fastest 15-min train), or 1.5B (ultra-lightweight)
+    model_name = os.getenv("BASE_MODEL", "unsloth/Qwen2.5-Coder-7B-Instruct-bnb-4bit")
+    output_model_dir = "sqlwhisperer-slm-q4"
+
+    # Dataset paths
+    train_candidates = [
+        "train_slm_curated.jsonl",
+        "data/training_datasets/slm_prepared/train_slm_curated.jsonl",
+        "train_chatml.jsonl",
+        "data/training_datasets/train_chatml.jsonl",
+    ]
+    val_candidates = [
+        "val_slm_curated.jsonl",
+        "data/training_datasets/slm_prepared/val_slm_curated.jsonl",
+        "val_chatml.jsonl",
+        "data/training_datasets/val_chatml.jsonl",
+    ]
+
+    train_path = next((p for p in train_candidates if os.path.isfile(p)), train_candidates[0])
+    val_path = next((p for p in val_candidates if os.path.isfile(p)), None)
 
     print(f"Loading Base Model: {model_name} in 4-bit...")
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -59,10 +76,16 @@ def main():
         random_state=42,
     )
 
-    # 3. Load Harvested Dataset
-    print(f"Loading training data from: {dataset_path}...")
-    dataset = load_dataset("json", data_files=dataset_path, split="train")
-    print(f"Dataset loaded: {len(dataset)} instruction pairs.")
+    # 3. Load Datasets
+    print(f"Loading SLM training data from: {train_path}...")
+    train_dataset = load_dataset("json", data_files=train_path, split="train")
+    print(f"Training dataset loaded: {len(train_dataset)} instruction pairs.")
+
+    val_dataset = None
+    if val_path and os.path.isfile(val_path):
+        print(f"Loading validation data from: {val_path}...")
+        val_dataset = load_dataset("json", data_files=val_path, split="train")
+        print(f"Validation dataset loaded: {len(val_dataset)} instruction pairs.")
 
     # Format ChatML messages into prompt string
     def formatting_prompts_func(examples):
@@ -70,18 +93,22 @@ def main():
         texts = [tokenizer.apply_chat_template(convo, tokenize=False, add_generation_prompt=False) for convo in convos]
         return {"text": texts}
 
-    dataset = dataset.map(formatting_prompts_func, batched=True)
+    train_dataset = train_dataset.map(formatting_prompts_func, batched=True)
+    if val_dataset:
+        val_dataset = val_dataset.map(formatting_prompts_func, batched=True)
 
     # 4. Training Arguments
     training_args = TrainingArguments(
         per_device_train_batch_size=2,
         gradient_accumulation_steps=4,
         warmup_steps=10,
-        max_steps=120,           # ~15-20 minutes on Colab Free T4 GPU
+        max_steps=150,           # ~20-25 minutes on Colab Free T4 GPU
         learning_rate=2e-4,
         fp16=not torch.cuda.is_bf16_supported(),
         bf16=torch.cuda.is_bf16_supported(),
         logging_steps=10,
+        eval_strategy="steps" if val_dataset else "no",
+        eval_steps=30 if val_dataset else None,
         optim="adamw_8bit",
         weight_decay=0.01,
         lr_scheduler_type="cosine",
@@ -93,7 +120,8 @@ def main():
     trainer = SFTTrainer(
         model=model,
         tokenizer=tokenizer,
-        train_dataset=dataset,
+        train_dataset=train_dataset,
+        eval_dataset=val_dataset,
         dataset_text_field="text",
         max_seq_length=max_seq_length,
         dataset_num_proc=2,

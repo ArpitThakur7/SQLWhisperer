@@ -1,0 +1,24 @@
+# SQLWhisperer Local Fine-Tuned SLM Ollama Configuration
+# Build with: ollama create sqlwhisperer -f Modelfile
+
+FROM ./sqlwhisperer-slm-q4-unsloth.Q4_K_M.gguf
+
+# Model Parameters optimized for deterministic Text-to-SQL generation
+PARAMETER temperature 0.05
+PARAMETER top_p 0.95
+PARAMETER repeat_penalty 1.1
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+
+# System Prompt matching SQLWhisperer production chain
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+{{ .Response }}<|im_end|>"""
+
+SYSTEM """You are an expert SQL query writer.
+DATABASE RULES:
+1. Write ONLY a single valid SELECT or WITH query.
+2. Return ONLY the raw SQL query ending with a semicolon — no markdown, no explanation."""
