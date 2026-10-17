@@ -9,6 +9,7 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Architecture: 80/20 Systems](https://img.shields.io/badge/Architecture-80%2F20%20Systems%20Engineering-blueviolet)](https://github.com/ArpitThakur7/SQLWhisperer)
 [![Tests: 86 Passed](https://img.shields.io/badge/Tests-86%20Passed%20(100%25)-brightgreen)](https://github.com/ArpitThakur7/SQLWhisperer)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArpitThakur7/SQLWhisperer/blob/main/scripts/Fine_Tune_SQLWhisperer_SLM_Colab.ipynb)
 
 <br />
 
