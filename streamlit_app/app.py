@@ -202,7 +202,30 @@ def render_result(result: dict, key_suffix: str | int | None = None) -> None:
                     )
                     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
+                # ── Widget Session-State Keys ─────────────────────
+                key_ctype = f"ctype_{ruid}"
+                key_cx = f"cx_{ruid}"
+                key_cy = f"cy_{ruid}"
+                key_pal = f"pal_{ruid}"
+                key_trend = f"trend_{ruid}"
+
                 # ── Studio Controls Toolbar ───────────────────────
+                chart_options = [
+                    "Auto (Recommended)",
+                    "Treemap",
+                    "Heatmap",
+                    "Funnel",
+                    "Choropleth",
+                    "Area",
+                    "Line",
+                    "Pie",
+                    "Bar",
+                    "Scatter",
+                    "Box",
+                    "Metric",
+                ]
+                y_choices = num_cols if num_cols else all_cols
+
                 col_info, col_popover = st.columns([3, 1])
                 with col_info:
                     st.caption(
@@ -211,72 +234,65 @@ def render_result(result: dict, key_suffix: str | int | None = None) -> None:
                     )
                 with col_popover:
                     with st.popover("⚙️ Customize Visual"):
-                        chart_options = [
-                            "Auto (Recommended)",
-                            "Treemap",
-                            "Heatmap",
-                            "Funnel",
-                            "Choropleth",
-                            "Area",
-                            "Line",
-                            "Pie",
-                            "Bar",
-                            "Scatter",
-                            "Box",
-                            "Metric",
-                        ]
-                        chosen_chart = st.selectbox(
-                            "📊 Chart Type",
-                            chart_options,
-                            key=f"ctype_{ruid}",
-                        )
                         x_default_idx = (
                             all_cols.index(rec.x_col)
                             if rec.x_col in all_cols
                             else 0
                         )
-                        custom_x = st.selectbox(
-                            "X-Axis / Category",
-                            all_cols,
-                            index=x_default_idx if all_cols else 0,
-                            key=f"cx_{ruid}",
-                        )
-                        y_choices = num_cols if num_cols else all_cols
                         y_default_idx = (
                             y_choices.index(rec.y_col)
                             if rec.y_col in y_choices
                             else 0
                         )
-                        custom_y = st.selectbox(
+                        st.selectbox(
+                            "📊 Chart Type",
+                            chart_options,
+                            key=key_ctype,
+                        )
+                        st.selectbox(
+                            "X-Axis / Category",
+                            all_cols,
+                            index=x_default_idx if all_cols else 0,
+                            key=key_cx,
+                        )
+                        st.selectbox(
                             "Y-Axis / Measure",
                             y_choices,
                             index=y_default_idx if y_choices else 0,
-                            key=f"cy_{ruid}",
+                            key=key_cy,
                         )
-                        chosen_palette = st.selectbox(
+                        st.selectbox(
                             "Theme Palette",
                             list(PALETTES.keys()),
-                            key=f"pal_{ruid}",
+                            key=key_pal,
                         )
-                        show_trend = st.checkbox(
+                        st.checkbox(
                             "📈 Show Trendline / Moving Avg",
                             value=False,
-                            key=f"trend_{ruid}",
+                            key=key_trend,
                         )
 
+                # Read effective values from session_state (persists across reruns
+                # even when the popover is closed and widgets don't render)
+                chosen_chart = st.session_state.get(key_ctype, "Auto (Recommended)")
+                custom_x = st.session_state.get(key_cx, rec.x_col)
+                custom_y = st.session_state.get(key_cy, rec.y_col)
+                chosen_palette = st.session_state.get(key_pal, "Cyberpunk Neon")
+                show_trend = st.session_state.get(key_trend, False)
+
                 # Determine effective parameters
-                override_type = None if "chosen_chart" not in locals() or chosen_chart.startswith("Auto") else chosen_chart.lower()
-                active_palette = chosen_palette if "chosen_palette" in locals() else "Cyberpunk Neon"
+                override_type = None if chosen_chart.startswith("Auto") else chosen_chart.lower()
+                active_palette = chosen_palette
 
                 try:
                     fig = create_plotly_figure(
                         df,
                         rec=rec,
                         override_type=override_type,
-                        override_x=custom_x if "custom_x" in locals() else rec.x_col,
-                        override_y=custom_y if "custom_y" in locals() else rec.y_col,
+                        override_x=custom_x,
+                        override_y=custom_y,
                         palette_name=active_palette,
-                        show_trendline=show_trend if "show_trend" in locals() else False,
+                        show_trendline=show_trend,
                     )
                     st.plotly_chart(
                         fig,
