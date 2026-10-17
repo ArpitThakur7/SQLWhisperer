@@ -23,7 +23,13 @@ ENV/
 .env
 
 # Data & Test Artifacts
-data/
+data/*
+!data/training_datasets/
+data/training_datasets/*
+!data/training_datasets/slm_prepared/
+data/training_datasets/slm_prepared/*
+!data/training_datasets/slm_prepared/*.jsonl
+!data/training_datasets/slm_prepared/*.json
 logs/
 *.db
 .pytest_cache/
