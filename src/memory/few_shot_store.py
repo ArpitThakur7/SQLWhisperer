@@ -5,6 +5,7 @@ the most semantically similar examples at query time to improve
 SQL generation accuracy.
 """
 
+import re
 from langchain_core.documents import Document
 from src.config.settings import settings
 from loguru import logger
@@ -22,6 +23,61 @@ class LocalChromaEmbeddings:
 
     def embed_query(self, text: str) -> list[float]:
         return [float(x) for x in self._ef([text])[0]]
+
+
+DEFAULT_GOLDEN_EXAMPLES: list[dict] = [
+    {
+        "question": "Show all customers that ordered at most 2 products with price less than 250 and their country",
+        "sql": (
+            "SELECT c.id, c.name, c.country, COUNT(oi.product_id) AS product_count "
+            "FROM customers c "
+            "JOIN orders o ON c.id = o.customer_id "
+            "JOIN order_items oi ON o.id = oi.order_id "
+            "JOIN products p ON oi.product_id = p.id "
+            "WHERE p.price < 250 "
+            "GROUP BY c.id, c.name, c.country "
+            "HAVING COUNT(oi.product_id) <= 2;"
+        ),
+        "explanation": "4-table join bridging customers to products via orders and order_items with price filter and <= 2 count filter."
+    },
+    {
+        "question": "Top 5 products by total revenue",
+        "sql": (
+            "SELECT p.name, SUM(oi.quantity * oi.unit_price) AS total_revenue "
+            "FROM products p "
+            "JOIN order_items oi ON p.id = oi.product_id "
+            "JOIN orders o ON oi.order_id = o.id "
+            "WHERE o.status != 'cancelled' "
+            "GROUP BY p.id, p.name "
+            "ORDER BY total_revenue DESC "
+            "LIMIT 5;"
+        ),
+        "explanation": "Calculates revenue by multiplying quantity by unit_price in order_items excluding cancelled orders."
+    },
+    {
+        "question": "List all customers from Germany who placed orders with status pending",
+        "sql": (
+            "SELECT DISTINCT c.id, c.name, c.email, c.country "
+            "FROM customers c "
+            "JOIN orders o ON c.id = o.customer_id "
+            "WHERE c.country = 'Germany' AND o.status = 'pending';"
+        ),
+        "explanation": "Joins customers to orders filtering by customer country and order status."
+    },
+    {
+        "question": "Total sales volume and revenue by product category",
+        "sql": (
+            "SELECT p.category, SUM(oi.quantity) AS total_units_sold, SUM(oi.quantity * oi.unit_price) AS total_revenue "
+            "FROM products p "
+            "JOIN order_items oi ON p.id = oi.product_id "
+            "JOIN orders o ON oi.order_id = o.id "
+            "WHERE o.status != 'cancelled' "
+            "GROUP BY p.category "
+            "ORDER BY total_revenue DESC;"
+        ),
+        "explanation": "Groups product categories with revenue and units sold."
+    }
+]
 
 
 class FewShotStore:
@@ -159,7 +215,24 @@ class FewShotStore:
                 return ""
 
         if not docs:
-            return ""
+            # Fallback to curated golden examples by keyword overlap
+            q_words = set(re.findall(r"\b\w+\b", question.lower()))
+            scored = []
+            for ex in DEFAULT_GOLDEN_EXAMPLES:
+                ex_words = set(re.findall(r"\b\w+\b", ex["question"].lower()))
+                score = len(q_words & ex_words)
+                scored.append((score, ex))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            best_examples = [ex for s, ex in scored[:k] if s > 0]
+            if not best_examples:
+                best_examples = DEFAULT_GOLDEN_EXAMPLES[:2]
+
+            lines = ["SIMILAR QUERIES FOR REFERENCE:"]
+            for i, ex in enumerate(best_examples, 1):
+                lines.append(f"\nExample {i}:")
+                lines.append(f"  Question: {ex['question']}")
+                lines.append(f"  SQL: {ex['sql']}")
+            return "\n".join(lines)
 
         lines = ["SIMILAR QUERIES FOR REFERENCE:"]
         for i, doc in enumerate(docs[:k], 1):

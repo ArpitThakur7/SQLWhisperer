@@ -7,23 +7,23 @@
     "unsloth/Qwen2.5-Coder-1.5B-Instruct-bnb-4bit",
     "unsloth/Llama-3.2-3B-Instruct-bnb-4bit"
   ],
-  "training_samples": 12219,
+  "training_samples": 12223,
   "validation_samples": 1034,
-  "total_queries": 13253,
+  "total_queries": 13257,
   "complexity_breakdown": {
     "multi_table_relational": 3500,
-    "aggregation": 1500,
-    "multiple_joins": 1500,
-    "ddl_mapping": 3500,
     "window functions": 1200,
+    "aggregation": 1500,
+    "ddl_mapping": 3500,
+    "multiple_joins": 1500,
     "domain_enterprise": 736,
     "CTEs": 273,
-    "domain_analytics": 10
+    "domain_analytics": 14
   },
   "token_audit": {
-    "total_samples": 12219,
+    "total_samples": 12223,
     "min_tokens": 211,
-    "mean_tokens": 310.6,
+    "mean_tokens": 310.7,
     "median_tokens": 277,
     "p90_tokens": 414,
     "p99_tokens": 717,

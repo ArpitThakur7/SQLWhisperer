@@ -74,9 +74,22 @@ def load_model():
     if model is not None:
         return
 
+    # Dynamically detect base model from adapter_config.json
+    base_source = str(BASE_MODEL_CACHE)
+    adapter_cfg_file = LORA_PATH / "adapter_config.json"
+    if adapter_cfg_file.is_file():
+        try:
+            with open(adapter_cfg_file, "r", encoding="utf-8") as f:
+                cfg_data = json.load(f)
+                b_path = cfg_data.get("base_model_name_or_path")
+                if b_path and (Path(b_path).exists() or not b_path.startswith("C:")):
+                    base_source = b_path
+        except Exception:
+            pass
+
     print("=" * 65)
     print("[*] Initializing SQLWhisperer Local SLM Engine on RTX 4050...")
-    print(f"    Base Model: {BASE_MODEL_CACHE}")
+    print(f"    Base Model: {base_source}")
     print(f"    LoRA Path:  {LORA_PATH}")
     print("=" * 65)
 
@@ -87,9 +100,9 @@ def load_model():
         bnb_4bit_use_double_quant=True,
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(str(BASE_MODEL_CACHE), trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_source, trust_remote_code=True)
     base = AutoModelForCausalLM.from_pretrained(
-        str(BASE_MODEL_CACHE),
+        base_source,
         quantization_config=bnb_config,
         device_map={"": 0},
         dtype=torch.bfloat16,

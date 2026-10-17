@@ -191,6 +191,39 @@ TABLE_SELECTOR_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
+def build_join_hints(meta: dict[str, dict[str, Any]], tables: list[str]) -> str:
+    """Generate explicit human-readable join pathways and relationship rules."""
+    lines = [
+        "\n/* ═══════════════════════════════════════════════════════════",
+        "   DATABASE RELATIONSHIP ROADMAP & JOIN HINTS:",
+    ]
+    has_fks = False
+    for t in tables:
+        details = meta.get(t, {})
+        for fk in details.get("foreign_keys", []):
+            src_cols = ", ".join(fk.get("constrained_columns", []))
+            ref_tbl = fk.get("referred_table", "")
+            ref_cols = ", ".join(fk.get("referred_columns", []))
+            if ref_tbl in tables:
+                has_fks = True
+                lines.append(f"   • {t}.{src_cols} = {ref_tbl}.{ref_cols}")
+
+    if not has_fks:
+        return ""
+
+    lines.append("")
+    lines.append("   CRITICAL JOIN & SCHEMA RULES:")
+    lines.append("   - To connect tables that do not share a direct foreign key, bridge through intermediate junction tables.")
+    lines.append("   - To join 'customers' to 'order_items' or 'products', bridge through 'orders':")
+    lines.append("     FROM customers c JOIN orders o ON c.id = o.customer_id JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id")
+    lines.append("   - 'order_items' does NOT have a customer_id column; use orders.customer_id.")
+    lines.append("   - 'order_items' price is named 'unit_price' (never use order_items.price).")
+    lines.append("   - 'products' catalog price is named 'price'.")
+    lines.append("   - Do NOT add filters (like category = 'clothing') unless the user explicitly requested it in the question.")
+    lines.append("   ═══════════════════════════════════════════════════════════ */\n")
+    return "\n".join(lines)
+
+
 # ── Chain Factory ─────────────────────────────────────────────────
 
 
@@ -225,8 +258,9 @@ def create_schema_retriever():
             valid_tables = [t for t in selected_tables if t in all_tables]
             logger.debug(f"⚡ Smart Schema Selector (FK Graph) resolved tables in 0ms: {valid_tables}")
             schema = get_table_info(valid_tables, database_url=db_url)
+            join_hints = build_join_hints(meta, valid_tables)
             return {
-                "table_info": schema,
+                "table_info": schema + join_hints,
                 "table_names": valid_tables,
             }
 
@@ -234,8 +268,9 @@ def create_schema_retriever():
         if len(all_tables) <= 8:
             logger.debug(f"⚡ Small schema fast-path (<=8 tables): including all {len(all_tables)} tables.")
             schema = get_table_info(all_tables, database_url=db_url)
+            join_hints = build_join_hints(meta, all_tables)
             return {
-                "table_info": schema,
+                "table_info": schema + join_hints,
                 "table_names": all_tables,
             }
 

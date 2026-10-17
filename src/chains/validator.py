@@ -142,6 +142,7 @@ def validate_sql_pure_ast(
     table_info: str = "",
     database_url: str | None = None,
     dialect_name: str = "sqlite",
+    question: str = "",
 ) -> ValidationResult:
     """Validate SQL deterministically using sqlglot AST and schema inspection.
 
@@ -291,8 +292,15 @@ def validate_sql_pure_ast(
                             col_node.set("this", exp.to_identifier(healed))
                             warnings.append(f"Auto-healed column '{c_name}' to '{healed}' in table '{real_table}'.")
                         else:
-                            avail = sorted(list(valid_cols))
-                            errors.append(f"Column '{c_name}' does not exist in table '{real_table}'. Available columns: {avail}.")
+                            if c_name == "customer_id" and real_table == "order_items":
+                                errors.append(
+                                    "Schema Error: 'order_items' does NOT have a 'customer_id' column. "
+                                    "To join 'customers' to 'order_items', bridge through 'orders': "
+                                    "customers c JOIN orders o ON c.id = o.customer_id JOIN order_items oi ON o.id = oi.order_id."
+                                )
+                            else:
+                                avail = sorted(list(valid_cols))
+                                errors.append(f"Column '{c_name}' does not exist in table '{real_table}'. Available columns: {avail}.")
             else:
                 # Unqualified column
                 if c_name not in select_aliases:
@@ -349,6 +357,34 @@ def validate_sql_pure_ast(
                         warnings.append(
                             f"Expression '{col_name}' in SELECT is not included in GROUP BY."
                         )
+
+    # Check 8a: Unrequested Literal Filter Guard
+    if question:
+        q_norm = question.lower()
+        allowed_system_literals = {
+            "cancelled", "canceled", "completed", "delivered", "shipped",
+            "pending", "active", "inactive", "refunded", "success", "failed", "0", "1", "true", "false"
+        }
+        for eq_node in list(root.find_all(exp.EQ)):
+            if isinstance(eq_node.right, exp.Literal) and eq_node.right.is_string:
+                lit_val = eq_node.right.this.lower().strip()
+                if lit_val not in allowed_system_literals and lit_val not in q_norm:
+                    col_str = eq_node.left.sql()
+                    eq_node.replace(exp.true())
+                    warnings.append(
+                        f"Auto-stripped hallucinated filter '{col_str} = '{lit_val}'' because '{lit_val}' was never requested in question."
+                    )
+
+    # Check 8b: Inverted Operator Guard
+    if question:
+        q_norm = question.lower()
+        is_less_than = any(term in q_norm for term in ["less than", "leaa th", "under", "below", "at most", "maximum", "<="])
+        if is_less_than:
+            for gte_node in list(root.find_all(exp.GTE)):
+                node_str = gte_node.left.sql().lower()
+                if "count" in node_str or "quantity" in node_str or "price" in node_str:
+                    gte_node.replace(exp.LTE(this=gte_node.this, expression=gte_node.expression))
+                    warnings.append("Auto-corrected operator '>=' to '<=' to match 'less than or equal' question intent.")
 
     # Check 8: Safety & Auto-Fixes (LIMIT injection & Pretty Formatting)
     fixed_sql: str | None = None
@@ -440,6 +476,7 @@ def create_validation_chain():
             table_info=table_info,
             database_url=db_url,
             dialect_name=dialect,
+            question=question,
         )
 
         # If AST validator found definitive syntax/schema errors, return immediately!

@@ -316,6 +316,14 @@ def process_domain_and_golden() -> list[dict[str, Any]]:
          "SELECT id, customer_id, order_date, status, total_amount FROM orders WHERE shipping_country = 'Canada' AND total_amount > 300 ORDER BY total_amount DESC;"),
         ("Identify customers who have placed more than 3 orders",
          "SELECT c.name, c.email, COUNT(o.id) AS order_count, ROUND(SUM(o.total_amount), 2) AS lifetime_value FROM customers c JOIN orders o ON c.id = o.customer_id WHERE o.status != 'cancelled' GROUP BY c.name, c.email HAVING COUNT(o.id) > 3 ORDER BY order_count DESC;"),
+        ("show all customers that ordered less than or equal 2 products and price less than 250 and their country",
+         "SELECT c.id, c.name, c.country, COUNT(oi.product_id) AS product_count FROM customers c JOIN orders o ON c.id = o.customer_id JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id WHERE p.price < 250 GROUP BY c.id, c.name, c.country HAVING COUNT(oi.product_id) <= 2;"),
+        ("show all customers that ordered leaa thN OR EQUAL 2 PRODUCTS AND PRICE LESS THAN 250 AND THEIR COUNTRY",
+         "SELECT c.id, c.name, c.country, COUNT(oi.product_id) AS product_count FROM customers c JOIN orders o ON c.id = o.customer_id JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id WHERE p.price < 250 GROUP BY c.id, c.name, c.country HAVING COUNT(oi.product_id) <= 2;"),
+        ("Find customers who ordered at most 3 items with price under 100",
+         "SELECT c.name, c.email, COUNT(oi.id) AS item_count FROM customers c JOIN orders o ON c.id = o.customer_id JOIN order_items oi ON o.id = oi.order_id JOIN products p ON oi.product_id = p.id WHERE p.price < 100 GROUP BY c.name, c.email HAVING COUNT(oi.id) <= 3;"),
+        ("Show products that have total sales less than or equal to 500",
+         "SELECT p.name, COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_sales FROM products p JOIN order_items oi ON p.id = oi.product_id JOIN orders o ON oi.order_id = o.id WHERE o.status != 'cancelled' GROUP BY p.name HAVING total_sales <= 500;"),
     ]
 
     for q, sql in golden_queries:

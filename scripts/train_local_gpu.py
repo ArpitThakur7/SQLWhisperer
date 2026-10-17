@@ -72,10 +72,16 @@ def main():
         print("    pip install peft trl accelerate bitsandbytes datasets\n")
         sys.exit(1)
 
-    # 1. Configuration
-    model_id = os.getenv("LOCAL_BASE_MODEL", "qwen/Qwen2.5-Coder-1.5B-Instruct")
-    max_seq_length = 1024  # Tailored for 6GB VRAM
-    max_steps = int(os.getenv("TRAIN_STEPS", "150"))  # ~15 min on RTX 4050
+    import argparse
+    parser = argparse.ArgumentParser(description="SQLWhisperer GPU Fine-Tuning")
+    parser.add_argument("--model", type=str, default=os.getenv("LOCAL_BASE_MODEL", "qwen/Qwen2.5-Coder-3B-Instruct"), help="Base model identifier")
+    parser.add_argument("--steps", type=int, default=int(os.getenv("TRAIN_STEPS", "150")), help="Number of training steps")
+    parser.add_argument("--seq-len", type=int, default=1024, help="Max sequence length")
+    args, _ = parser.parse_known_args()
+
+    model_id = args.model
+    max_seq_length = args.seq_len
+    max_steps = args.steps
 
     print("=" * 65)
     print(f"[*] SQLWhisperer Local GPU Training on {torch.cuda.get_device_name(0)}")
