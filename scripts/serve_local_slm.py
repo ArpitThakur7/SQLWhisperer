@@ -148,9 +148,10 @@ def chat_completions(request: ChatCompletionRequest):
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=request.max_tokens or 512,
+            max_new_tokens=min(request.max_tokens or 192, 256),
             do_sample=False,
             repetition_penalty=1.1,
+            pad_token_id=tokenizer.eos_token_id,
         )
 
     # Decode assistant response

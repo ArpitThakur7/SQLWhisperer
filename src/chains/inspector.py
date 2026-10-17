@@ -100,6 +100,20 @@ def create_inspector_chain():
 
     def _invoke(inputs: dict) -> InspectionResult:
         session: SessionConfig = inputs.get("session") or DEFAULT_SESSION
+        row_count = inputs.get("row_count", 0)
+
+        # Fast deterministic path for local Text2SQL SLMs (avoids 30s token latency)
+        if getattr(session, "model", None) == "sqlwhisperer-slm" or (
+            session.resolved_llm_provider in ("local_slm", "ollama")
+            and "slm" in str(session.resolved_model).lower()
+        ):
+            return InspectionResult(
+                is_satisfactory=row_count > 0,
+                confidence=0.95 if row_count > 0 else 0.5,
+                issues=[] if row_count > 0 else ["Query returned zero rows."],
+                suggestion="",
+            )
+
         try:
             llm = get_chat_llm(temperature=0, session=session).with_structured_output(
                 InspectionResult

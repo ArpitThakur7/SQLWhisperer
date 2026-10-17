@@ -444,18 +444,26 @@ async def stream_pipeline(question: str, session: SessionConfig | None = None):
         )
 
         if not validation.is_valid:
-            yield {
-                "stage": "validation",
-                "status": "warning",
-                "issues": validation.issues,
-                "severity": validation.severity,
-                "message": f"Validation issues detected: {'; '.join(validation.issues)}",
-            }
-            error_history.append({
-                "sql": sql,
-                "error": f"Validation ({validation.severity}): {'; '.join(validation.issues)}",
-            })
-            continue
+            if validation.fixed_sql:
+                sql = validation.fixed_sql
+                yield {
+                    "stage": "validation",
+                    "status": "passed",
+                    "message": "SQL auto-corrected by AST self-healing engine.",
+                }
+            else:
+                yield {
+                    "stage": "validation",
+                    "status": "warning",
+                    "issues": validation.issues,
+                    "severity": validation.severity,
+                    "message": f"Validation issues detected: {'; '.join(validation.issues)}",
+                }
+                error_history.append({
+                    "sql": sql,
+                    "error": f"Validation ({validation.severity}): {'; '.join(validation.issues)}",
+                })
+                continue
 
         yield {
             "stage": "validation",

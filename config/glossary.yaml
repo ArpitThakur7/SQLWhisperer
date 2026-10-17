@@ -30,8 +30,15 @@ synonyms:
   sales: "orders"
   purchases: "orders"
   transactions: "orders"
+  revenue: "orders"
+  spend: "orders"
+  turnover: "orders"
 
 rules:
   - "Always exclude orders with status = 'cancelled' when computing revenue, order counts, or sales volume unless explicitly requested."
   - "When the user asks for 'top products', rank by total revenue (or quantity sold if specified) in descending order."
+  - "In the 'order_items' table, the price column is named 'unit_price' (never write 'order_items.price')."
+  - "To calculate product revenue, join 'products' p with 'order_items' oi ON p.id = oi.product_id and SUM(oi.quantity * oi.unit_price) (or join 'orders' o) GROUP BY p.id, p.name ORDER BY 2 DESC."
+  - "To calculate sales or revenue by product category, join 'products' p with 'order_items' oi ON p.id = oi.product_id and SUM(oi.quantity * oi.unit_price) GROUP BY p.category ORDER BY 2 DESC."
+  - "Every table referenced in an ON condition or SELECT list MUST be explicitly listed in the FROM or JOIN clause (e.g., if using customers.id, JOIN customers c ON ...)."
   - "Ensure table aliases are clear and standardized: c for customers, o for orders, p for products, oi for order_items."

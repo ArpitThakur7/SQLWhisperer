@@ -144,17 +144,28 @@ def select_tables_heuristically(
 
     # Select tables with positive score
     candidates = {t for t, score in scores.items() if score > 0}
-
-    # If small database (<= 6 tables), include all candidates or full schema if none matched
     total_tables = len(meta)
-    if not candidates:
-        if total_tables <= 6:
-            return list(meta.keys())
-        return []
 
-    # If small schema and we have candidates, connect them with FK bridge tables
+    # For small and medium databases (<= 8 tables), return the complete schema.
+    # Pruning tables in small databases causes broken multi-table joins and
+    # hallucinated column names, whereas passing all tables consumes <400 tokens.
+    if total_tables <= 8:
+        return sorted(list(meta.keys()))
+
+    if not candidates:
+        return sorted(list(meta.keys())[:8])
+
+    # If large schema, connect candidates with FK bridge tables and 1-hop neighbors
     fk_graph = build_fk_graph(meta)
     connected_candidates = connect_table_islands(fk_graph, candidates)
+
+    # Include 1-hop foreign key neighbors for aggregation / metric queries
+    metric_terms = {"revenue", "sales", "total", "spend", "spent", "amount", "count", "sum", "avg", "cost", "profit"}
+    if any(t in q_lower for t in metric_terms):
+        expanded = set(connected_candidates)
+        for c in connected_candidates:
+            expanded.update(fk_graph.get(c, set()))
+        connected_candidates = expanded
 
     return sorted(list(connected_candidates))
 

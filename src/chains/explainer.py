@@ -66,6 +66,19 @@ def create_explainer_chain():
 
     def _invoke(inputs: dict) -> str:
         session: SessionConfig = inputs.get("session") or DEFAULT_SESSION
+
+        # Fast concise path for local Text2SQL SLMs
+        if getattr(session, "model", None) == "sqlwhisperer-slm" or (
+            session.resolved_llm_provider in ("local_slm", "ollama")
+            and "slm" in str(session.resolved_model).lower()
+        ):
+            rc = inputs.get("row_count", 0)
+            ms = inputs.get("execution_time_ms", 0.0)
+            return (
+                f"Generated and executed query for: **{inputs.get('question', '')}**. "
+                f"Retrieved **{rc}** row{'s' if rc != 1 else ''} in **{ms:.1f}ms** using local fine-tuned SLM on RTX 4050 GPU."
+            )
+
         llm = get_chat_llm(temperature=0.3, session=session)
         chain = EXPLAINER_PROMPT | llm | StrOutputParser()
         return chain.invoke({

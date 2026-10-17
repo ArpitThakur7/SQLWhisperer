@@ -42,6 +42,10 @@ class SessionConfig:
         return (self.llm_provider or settings.llm_provider).lower().strip()
 
     @property
+    def resolved_provider(self) -> str:
+        return self.resolved_llm_provider
+
+    @property
     def resolved_model(self) -> str:
         """Return the model name for the active provider."""
         if self.model:

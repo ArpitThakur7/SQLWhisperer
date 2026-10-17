@@ -242,6 +242,7 @@ def validate_sql_pure_ast(
             referenced_tables.add(t_name)
             alias = tbl_node.alias.lower() if tbl_node.alias else t_name
             table_alias_map[alias] = t_name
+            table_alias_map[t_name] = t_name
 
     # Check 4: Table Existence
     if known_schema:
@@ -249,7 +250,7 @@ def validate_sql_pure_ast(
             if t_name not in known_schema and t_name not in cte_names:
                 errors.append(f"Table '{t_name}' does not exist in database schema.")
 
-    # Check 5: Column Existence
+    # Check 5: Column Existence & Scope
     if known_schema:
         # Collect SELECT aliases to avoid flagging them in HAVING/ORDER BY
         select_aliases = {
@@ -268,11 +269,30 @@ def validate_sql_pure_ast(
 
             # Qualified column (e.g. o.total_amount)
             if c_table:
+                # Ensure qualifier table is actually in the FROM or JOIN clause
+                if c_table not in table_alias_map and c_table not in cte_names:
+                    errors.append(
+                        f"Table '{c_table}' is referenced in '{c_table}.{c_name}' but is missing from FROM/JOIN clauses. "
+                        f"Included tables: {sorted(list(referenced_tables))}."
+                    )
+                    continue
+
                 real_table = table_alias_map.get(c_table, c_table)
                 if real_table in known_schema:
                     valid_cols = known_schema[real_table]
                     if valid_cols and c_name not in valid_cols:
-                        errors.append(f"Column '{c_name}' does not exist in table '{real_table}'.")
+                        # Auto-healing: check if there is a unique matching column (e.g. price -> unit_price)
+                        heal_matches = [
+                            col for col in valid_cols
+                            if col.endswith(f"_{c_name}") or col.startswith(f"{c_name}_") or (len(c_name) >= 4 and c_name in col)
+                        ]
+                        if len(heal_matches) == 1:
+                            healed = heal_matches[0]
+                            col_node.set("this", exp.to_identifier(healed))
+                            warnings.append(f"Auto-healed column '{c_name}' to '{healed}' in table '{real_table}'.")
+                        else:
+                            avail = sorted(list(valid_cols))
+                            errors.append(f"Column '{c_name}' does not exist in table '{real_table}'. Available columns: {avail}.")
             else:
                 # Unqualified column
                 if c_name not in select_aliases:
@@ -282,7 +302,12 @@ def validate_sql_pure_ast(
                     ]
                     if referenced_tables and not matching_tables and not (referenced_tables & cte_names):
                         all_ref = ", ".join(referenced_tables)
-                        errors.append(f"Column '{c_name}' does not exist in referenced table(s): {all_ref}.")
+                        # Auto-healing for unqualified column
+                        all_avail: list[str] = []
+                        for t in referenced_tables:
+                            if t in known_schema:
+                                all_avail.extend([f"{t}.{c}" for c in known_schema[t]])
+                        errors.append(f"Column '{c_name}' does not exist in referenced table(s): {all_ref}. Available columns: {all_avail}.")
                     elif len(matching_tables) > 1:
                         warnings.append(
                             f"Column '{c_name}' is ambiguous across tables: {', '.join(matching_tables)}."
