@@ -26,12 +26,14 @@ ENV/
 data/
 logs/
 *.db
+.pytest_cache/
 tests/_test_chroma*/
 scratch/
 PROJECT_NOTES.md
 
 # Docker
 postgres_data/
+redis_data/
 
 # OS
 .DS_Store

@@ -8,7 +8,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Architecture: 80/20 Systems](https://img.shields.io/badge/Architecture-80%2F20%20Systems%20Engineering-blueviolet)](https://github.com/sqlwhisperer/sqlwhisperer)
-[![Tests: 30 Passed](https://img.shields.io/badge/Tests-30%20Passed%20(100%25)-brightgreen)](https://github.com/sqlwhisperer/sqlwhisperer)
+[![Tests: 83 Passed](https://img.shields.io/badge/Tests-83%20Passed%20(100%25)-brightgreen)](https://github.com/sqlwhisperer/sqlwhisperer)
 
 <br />
 
@@ -24,7 +24,8 @@
 
 Most Text-to-SQL projects on GitHub are brittle 5-line wrappers that dump raw schemas into prompts and crash on complex joins. **SQLWhisperer takes an 80/20 systems engineering approach**:
 
-* 🎨 **High-End Auto-Visualization Studio**: Automatically inspects query result shapes and renders publication-ready Plotly charts — from **KPI Scorecard Ribbons** and **Spline Area Trends** to **Hierarchical Treemaps**, **Conversion Funnels**, **2D Matrix Heatmaps**, **Choropleth Maps**, and **Outlier Box Plots**.
+* ⚡ **Distributed Redis Caching & Rate Limiting**: Multi-tier exact hash cache and Redis Sorted Set (ZSET) sliding-window rate limiter with sub-millisecond lookups, surviving server restarts and synchronizing across multiple API workers (with automatic, zero-overhead fallback to local in-memory caching when running without Redis).
+* 🎨 **High-End Auto-Visualization Studio**: Automatically inspects query result shapes and renders publication-ready Plotly charts — from **KPI Scorecard Ribbons** and **Spline Area Trends** to **Hierarchical Treemaps**, **Conversion Funnels**, **2D Matrix Heatmaps**, **Choropleth Maps**, and **Outlier Box Plots**, complete with an interactive Studio Controls Toolbar for real-time chart type and axis overrides.
 * 💡 **Automated Data Insights**: Directly generates executive analytical highlights (identifying top contributors, Pareto concentration risk, and volatility spread) alongside visual charts.
 * ⚡ **Pure-AST Deterministic SQL Validator**: Uses `sqlglot` Abstract Syntax Trees to verify table/column existence against live catalogs, catch accidental Cartesian joins, and enforce ANSI `GROUP BY` rules in **`<1ms` consuming 0 LLM tokens**.
 * 🕸️ **Foreign Key Graph Traversal (BFS)**: Mathematically computes shortest-path join bridges across database schemas (e.g., `customers` $\to$ `orders` $\to$ `order_items` $\to$ `products`), guaranteeing junction tables are never omitted.
@@ -61,7 +62,15 @@ User Question
       │
       ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│ Context Retrieval (Parallel 0ms Fast-Path)                             │
+│ Distributed Rate Limiter & Multi-Tier Caching (0ms Fast-Path)          │
+│ ├─ Redis ZSET Sliding-Window Limiter (with in-memory fallback)         │
+│ ├─ Redis Tier 1A Exact Query Cache (with in-memory Tier 1B fallback)  │
+│ └─ Redis Schema Metadata Cache (30-min TTL DB catalog introspection)   │
+└────────────────────────────────────┬───────────────────────────────────┘
+                                     │ (On Cache Miss)
+                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ Context Retrieval & Memory                                             │
 │ ├─ FK Graph Traversal (BFS shortest-path table bridge discovery)       │
 │ ├─ Semantic Business Glossary (Vocabulary & metric rule expansion)     │
 │ └─ ChromaDB Vector Memory (Local ONNX all-MiniLM-L6-v2 embeddings)     │
@@ -103,9 +112,9 @@ SQLWhisperer features a high-performance **FastAPI** backend supporting both sta
   <img src="docs/images/fastapi_docs.png" alt="FastAPI Interactive OpenAPI Documentation" width="90%" style="border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" />
 </p>
 
-- `POST /api/v1/query`: Core natural language query endpoint with semantic caching.
+- `POST /api/v1/query`: Core natural language query endpoint with Redis/in-memory multi-tier caching.
 - `POST /api/v1/query/stream`: Real-time Server-Sent Events (SSE) streaming with stage diagnostics.
-- `GET /api/v1/health`: Live system health, engine dialect, and database status.
+- `GET /api/v1/health`: Live system health, engine dialect, Redis status, and active LLM provider.
 - `GET /api/v1/history`: Persisted query history with latency and confidence metrics.
 - `POST /api/v1/db/test`: Database connection tester and schema inspector.
 
@@ -123,7 +132,16 @@ run.bat
 
 ---
 
-### Option B: Manual Setup
+### Option B: Docker Compose (Full Stack with PostgreSQL & Redis)
+
+Launch the complete microservice stack (PostgreSQL, Redis 7, FastAPI, and Streamlit) with a single command:
+```bash
+docker compose up --build
+```
+
+---
+
+### Option C: Manual Setup
 
 1. **Clone & Install Dependencies**:
    ```bash
@@ -157,11 +175,13 @@ Then open:
 
 ## 🧪 Testing
 
-SQLWhisperer includes a comprehensive unit and integration test suite (30 tests):
+SQLWhisperer includes a comprehensive unit and integration test suite (**83/83 tests passing**):
 ```bash
 python -m pytest tests/
 ```
 Tests cover:
+- Distributed Redis caching, TTL expiration, and graceful in-memory fallback
+- Redis ZSET sliding-window rate limiting & multi-client isolation
 - Pure-AST validation & security sandbox enforcement
 - Foreign Key graph traversal & bridge connection
 - Query rewriting & safety LIMIT injection

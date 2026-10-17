@@ -1,6 +1,4 @@
- 
- 
- @echo off
+@echo off
 title SQLWhisperer Launcher
 color 0A
 
