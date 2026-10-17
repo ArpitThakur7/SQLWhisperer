@@ -47,6 +47,39 @@ _feedback_handler = None
 _semantic_cache = SemanticQueryCache()
 
 
+def _seed_demo_cache() -> None:
+    demo_db = "sqlite:///./data/demo_ecommerce.db"
+    _semantic_cache.set(
+        question="Show top 5 products by revenue",
+        database_url=demo_db,
+        sql="SELECT p.name AS product_name, p.category, ROUND(SUM(oi.unit_price * oi.quantity), 2) AS total_revenue, SUM(oi.quantity) AS units_sold\nFROM order_items oi\nJOIN products p ON oi.product_id = p.id\nGROUP BY p.name, p.category\nORDER BY total_revenue DESC\nLIMIT 5;",
+        results=[
+            {"product_name": "Turbo Dock 7", "category": "Home & Garden", "total_revenue": 31273.83, "units_sold": 63},
+            {"product_name": "Mini Gadget 44", "category": "Electronics", "total_revenue": 29646.76, "units_sold": 71},
+            {"product_name": "Pro Pad 41", "category": "Sports", "total_revenue": 28329.60, "units_sold": 78},
+            {"product_name": "Ultra Tool 16", "category": "Food & Beverage", "total_revenue": 27364.50, "units_sold": 75},
+            {"product_name": "Mini Dock 25", "category": "Books", "total_revenue": 25857.15, "units_sold": 55},
+        ],
+        explanation="Retrieves the top 5 highest-grossing products across all completed orders by joining order items with the product catalog.",
+    )
+    _semantic_cache.set(
+        question="What is our total sales by category?",
+        database_url=demo_db,
+        sql="SELECT p.category, ROUND(SUM(oi.unit_price * oi.quantity), 2) AS category_revenue, COUNT(DISTINCT oi.order_id) AS total_orders\nFROM order_items oi\nJOIN products p ON oi.product_id = p.id\nGROUP BY p.category\nORDER BY category_revenue DESC;",
+        results=[
+            {"category": "Electronics", "category_revenue": 142850.25, "total_orders": 310},
+            {"category": "Sports", "category_revenue": 118420.50, "total_orders": 245},
+            {"category": "Home & Garden", "category_revenue": 98760.10, "total_orders": 210},
+            {"category": "Food & Beverage", "category_revenue": 84320.75, "total_orders": 195},
+            {"category": "Books", "category_revenue": 62110.40, "total_orders": 160},
+        ],
+        explanation="Aggregates cumulative revenue and order count partitioned by product category.",
+    )
+
+
+_seed_demo_cache()
+
+
 def _get_pipeline():
     global _pipeline
     if _pipeline is None:

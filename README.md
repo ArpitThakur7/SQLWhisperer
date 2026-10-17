@@ -33,6 +33,19 @@ Most Text-to-SQL projects on GitHub are brittle 5-line wrappers that dump raw sc
 * 🧠 **100% Free & Offline Embeddings**: Runs ChromaDB few-shot learning on CPU with built-in ONNX `all-MiniLM-L6-v2` embeddings — zero paid OpenAI API key required.
 * 🛡️ **Zero-Trust Security Sandbox**: Single-statement enforcement, strict AST read-only verification, and engine-level read-only transactions.
 
+## 🖥️ Live Streamlit Studio & Interactive Workspace
+
+SQLWhisperer provides a sleek, dark-mode Web Studio designed for both business analysts and engineers:
+
+<p align="center">
+  <img src="docs/images/streamlit_ui.png" alt="SQLWhisperer Live Interface with Sidebar Schema Explorer & Health Indicator" width="95%" style="border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);" />
+</p>
+
+* 🔌 **Dynamic Database Switcher**: Toggle seamlessly between the embedded demo SQLite dataset, custom PostgreSQL/MySQL connection strings, or drag-and-drop SQLite file uploads.
+* 📂 **Live Schema Explorer**: Expand tables in the sidebar to inspect column types, primary keys, and real-time row counts without manual queries.
+* 🤖 **Multi-Provider AI Hot-Swapping**: Switch models across Groq (Llama 3.3 70B), Google Gemini (Gemini 2.0 Flash), local Ollama (100% offline), OpenRouter, and OpenAI directly from the sidebar.
+* ⚡ **Live Health & Cache Indicator**: Immediate visibility into database dialect connection and Redis/In-Memory cache status (`🟢 Connected • ⚡ Redis Active` / `🧠 In-Memory Cache`).
+
 ---
 
 ## 📊 Visual Studio Showcase
@@ -109,7 +122,8 @@ User Question
 SQLWhisperer features a high-performance **FastAPI** backend supporting both standard synchronous JSON requests and **Server-Sent Events (SSE)** for real-time progress streaming:
 
 <p align="center">
-  <img src="docs/images/fastapi_docs.png" alt="FastAPI Interactive OpenAPI Documentation" width="90%" style="border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" />
+  <img src="docs/images/fastapi_docs.png" alt="FastAPI Interactive OpenAPI Documentation" width="48%" style="border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); margin-right: 10px;" />
+  <img src="docs/images/fastapi_response.png" alt="FastAPI Live Health & Diagnostics Response" width="48%" style="border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" />
 </p>
 
 - `POST /api/v1/query`: Core natural language query endpoint with Redis/in-memory multi-tier caching.
