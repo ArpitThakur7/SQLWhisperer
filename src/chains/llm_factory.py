@@ -86,10 +86,10 @@ def get_chat_llm(
             base_url="https://openrouter.ai/api/v1",
         )
 
-    # 4. Ollama (100% Free & Offline)
-    if provider == "ollama":
-        base_url = f"{settings.ollama_base_url.rstrip('/')}/v1"
-        logger.debug(f"Instantiating Ollama model: {model} @ {base_url}")
+    # 4. Local SLM / Ollama (100% Free & Offline on RTX 4050 GPU)
+    if provider in ("ollama", "local_slm"):
+        base_url = f"{cfg.resolved_ollama_base_url.rstrip('/')}/v1"
+        logger.debug(f"Instantiating Local SLM / Ollama model: {model} @ {base_url}")
         return ChatOpenAI(
             model=model,
             temperature=temp,

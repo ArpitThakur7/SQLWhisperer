@@ -5,6 +5,7 @@ model selection, auto-charting, and conversational SQL querying.
 """
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import httpx
@@ -12,6 +13,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+from src.config.settings import settings
 from src.visualization.auto_chart import (
     detect_best_chart,
     create_plotly_figure,
@@ -442,20 +444,76 @@ with st.sidebar:
     st.divider()
 
     # ── LLM & Provider Settings ───────────────────────────────────
-    with st.expander("⚙️ LLM Provider & Free Models", expanded=True):
+    with st.expander("⚙️ LLM Provider & Model Selection", expanded=True):
+        provider_options = [
+            "🤖 Local Fine-Tuned SLM (RTX 4050 GPU — 0 Keys / Offline)",
+            "⚡ Groq (100% Free & Ultra-Fast)",
+            "🌐 Google Gemini (Free Tier)",
+            "💻 Ollama Daemon (Port 11434)",
+            "🔓 OpenRouter (Free Community Models)",
+            "🔑 OpenAI (Paid: GPT-4o)",
+        ]
+
+        # Determine default provider index based on .env settings
+        env_prov = getattr(settings, "llm_provider", "ollama").lower()
+        if env_prov in ("ollama", "local_slm"):
+            default_provider_idx = 0
+        elif env_prov == "groq":
+            default_provider_idx = 1
+        elif env_prov == "gemini":
+            default_provider_idx = 2
+        elif env_prov == "openrouter":
+            default_provider_idx = 4
+        elif env_prov == "openai":
+            default_provider_idx = 5
+        else:
+            default_provider_idx = 0
+
         provider_display = st.selectbox(
             "AI Provider",
-            [
-                "⚡ Groq (100% Free & Ultra-Fast)",
-                "🌐 Google Gemini (Free Tier)",
-                "💻 Ollama (100% Free & Offline / No Key)",
-                "🔓 OpenRouter (Free Community Models)",
-                "🔑 OpenAI (Paid: GPT-4o)",
-            ],
-            index=0,
+            provider_options,
+            index=default_provider_idx,
         )
 
-        if "Groq" in provider_display:
+        if "Local Fine-Tuned SLM" in provider_display:
+            st.session_state.selected_provider = "ollama"
+
+            # Check if local SLM GPU server is running on port 8001
+            slm_online = False
+            slm_gpu = "NVIDIA RTX 4050"
+            try:
+                with httpx.Client(timeout=1.0) as client:
+                    resp = client.get("http://localhost:8001/health")
+                    if resp.status_code == 200:
+                        slm_online = True
+                        slm_gpu = resp.json().get("device", "NVIDIA RTX 4050")
+            except Exception:
+                slm_online = False
+
+            if slm_online:
+                st.success(f"🟢 **Local GPU Server Online** (`{slm_gpu}`)\n\nRunning `sqlwhisperer-slm` locally at $0.00 cost.")
+            else:
+                st.warning("🟡 **Local Server Offline** — Run in terminal:\n`python scripts/serve_local_slm.py`")
+
+            col_u, col_m = st.columns(2)
+            with col_u:
+                slm_url = st.text_input(
+                    "SLM Endpoint",
+                    value=getattr(st.session_state, "selected_ollama_base_url", "http://localhost:8001"),
+                    help="URL of the local GPU server.",
+                )
+            with col_m:
+                slm_model = st.text_input(
+                    "Model ID",
+                    value=getattr(st.session_state, "selected_model", "sqlwhisperer-slm"),
+                    help="Name of the fine-tuned model.",
+                )
+
+            st.session_state.selected_ollama_base_url = slm_url
+            st.session_state.selected_model = slm_model
+            st.session_state.custom_api_key = ""
+
+        elif "Groq" in provider_display:
             st.session_state.selected_provider = "groq"
             st.markdown("👉 [Get a Free Groq API Key (instant)](https://console.groq.com/keys)")
             groq_key = st.text_input(
@@ -486,10 +544,14 @@ with st.sidebar:
                 ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
             )
 
-        elif "Ollama" in provider_display:
+        elif "Ollama Daemon" in provider_display:
             st.session_state.selected_provider = "ollama"
-            st.caption("💻 Runs on your machine with 0 keys. Run in terminal: `ollama run qwen2.5-coder:7b`")
+            st.caption("💻 Runs via standard Ollama daemon on port 11434.")
             st.session_state.custom_api_key = ""
+            st.session_state.selected_ollama_base_url = st.text_input(
+                "Ollama Base URL",
+                value="http://localhost:11434",
+            )
             st.session_state.selected_model = st.text_input("Ollama Model", value="qwen2.5-coder:7b")
 
         elif "OpenRouter" in provider_display:
@@ -700,8 +762,9 @@ if active_prompt:
             payload = {
                 "question": active_prompt,
                 "database_url": st.session_state.custom_db_url,
-                "llm_provider": getattr(st.session_state, "selected_provider", "openai"),
-                "model": getattr(st.session_state, "selected_model", ""),
+                "llm_provider": getattr(st.session_state, "selected_provider", "ollama"),
+                "model": getattr(st.session_state, "selected_model", "sqlwhisperer-slm"),
+                "ollama_base_url": getattr(st.session_state, "selected_ollama_base_url", "http://localhost:8001"),
             }
             if st.session_state.custom_api_key:
                 payload["api_key"] = st.session_state.custom_api_key
@@ -709,8 +772,7 @@ if active_prompt:
             response = None
             with st.status("🔮 Running self-healing query pipeline...", expanded=True) as status_box:
                 try:
-                    import httpx
-                    stream_url = f"{API_BASE_URL}/query/stream"
+                    stream_url = f"{API_URL}/query/stream"
                     with httpx.Client(timeout=45.0) as client:
                         with client.stream("POST", stream_url, json=payload) as r:
                             for raw_line in r.iter_lines():

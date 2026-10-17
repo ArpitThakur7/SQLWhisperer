@@ -12,6 +12,12 @@ def setup_logging(level: str = "INFO") -> None:
     """
     logger.remove()  # Remove default handler
 
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     # Console: human-readable, coloured
     logger.add(
         sys.stdout,

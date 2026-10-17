@@ -46,6 +46,16 @@ if %ERRORLEVEL% neq 0 (
 echo [2/5] Checking few-shot vector store...
 python -m scripts.seed_few_shots 2>nul
 
+:: Start Local SLM GPU server if model exists and port 8001 not listening
+netstat -aon | findstr ":8001" | findstr "LISTENING" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    if exist "models\sqlwhisperer-slm-lora" (
+        echo [*] Starting Local SLM Server (RTX 4050) on http://localhost:8001 ...
+        start /B "SQLWhisperer-SLM" cmd /c "python scripts\serve_local_slm.py > logs\slm.log 2>&1"
+        timeout /t 2 /nobreak >nul
+    )
+)
+
 :: Start FastAPI backend
 echo [3/5] Starting FastAPI backend on http://localhost:8000 ...
 start /B "SQLWhisperer-API" cmd /c "python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000 --reload > logs\api.log 2>&1"
@@ -65,10 +75,11 @@ echo  ========================================
 echo    SQLWhisperer is running!
 echo  ========================================
 echo.
-echo    Streamlit UI:  http://localhost:8501
-echo    API Docs:      http://localhost:8000/docs
-echo    API Log:       logs\api.log
-echo    UI Log:        logs\streamlit.log
+echo    Local SLM (GPU): http://localhost:8001 (RTX 4050)
+echo    Streamlit UI:    http://localhost:8501
+echo    API Docs:        http://localhost:8000/docs
+echo    API Log:         logs\api.log
+echo    UI Log:          logs\streamlit.log
 echo.
 echo    Run stop.bat to shut down all services.
 echo  ========================================

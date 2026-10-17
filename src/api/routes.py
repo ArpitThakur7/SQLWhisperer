@@ -113,6 +113,7 @@ async def run_query(request: QueryRequest):
             llm_provider=request.llm_provider.lower().strip() if request.llm_provider else None,
             api_key=request.api_key.strip() if request.api_key else None,
             model=request.model.strip() if request.model else None,
+            ollama_base_url=request.ollama_base_url.strip() if request.ollama_base_url else None,
         )
 
         # 1. Fast Semantic / Exact Cache Check
@@ -164,6 +165,7 @@ async def run_query_stream(request: QueryRequest):
         llm_provider=request.llm_provider.lower().strip() if request.llm_provider else None,
         api_key=request.api_key.strip() if request.api_key else None,
         model=request.model.strip() if request.model else None,
+        ollama_base_url=request.ollama_base_url.strip() if request.ollama_base_url else None,
     )
 
     async def event_generator():

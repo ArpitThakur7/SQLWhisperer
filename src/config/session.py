@@ -25,8 +25,13 @@ class SessionConfig:
     llm_provider: str | None = None
     api_key: str | None = None
     model: str | None = None
+    ollama_base_url: str | None = None
 
     # ── Resolved accessors (with fallback to global settings) ────
+
+    @property
+    def resolved_ollama_base_url(self) -> str:
+        return (self.ollama_base_url or settings.ollama_base_url).strip()
 
     @property
     def resolved_database_url(self) -> str:

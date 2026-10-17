@@ -43,7 +43,7 @@ redis_data/
 
 # Outputs & Models
 outputs_test/
-models/*/checkpoints/
+models/
 
 # OS
 .DS_Store

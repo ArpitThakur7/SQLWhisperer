@@ -27,6 +27,10 @@ class QueryRequest(BaseModel):
         default=None,
         description="Optional model override",
     )
+    ollama_base_url: str | None = Field(
+        default=None,
+        description="Optional Ollama/Local SLM base URL override (e.g. http://localhost:8001)",
+    )
 
 
 class DatabaseConnectRequest(BaseModel):

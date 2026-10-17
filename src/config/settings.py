@@ -29,9 +29,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
 
-    # Local Ollama config (100% Free & Offline)
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5-coder:7b"
+    # Local SLM / Ollama config (100% Free & Offline on RTX 4050 GPU)
+    ollama_base_url: str = "http://localhost:8001"
+    ollama_model: str = "sqlwhisperer-slm"
 
     # ── Target Database ───────────────────────────────────────────
     # Defaults to zero-setup SQLite demo DB, or PostgreSQL if specified

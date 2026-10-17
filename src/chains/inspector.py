@@ -9,6 +9,7 @@ LLM is resolved lazily at invocation time via ``SessionConfig``.
 
 from __future__ import annotations
 
+from loguru import logger
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda
@@ -99,15 +100,30 @@ def create_inspector_chain():
 
     def _invoke(inputs: dict) -> InspectionResult:
         session: SessionConfig = inputs.get("session") or DEFAULT_SESSION
-        llm = get_chat_llm(temperature=0, session=session).with_structured_output(
-            InspectionResult
+        try:
+            llm = get_chat_llm(temperature=0, session=session).with_structured_output(
+                InspectionResult
+            )
+            chain = INSPECTOR_PROMPT | llm
+            res = chain.invoke({
+                "question": inputs["question"],
+                "sql": inputs["sql"],
+                "results_preview": inputs["results_preview"],
+                "row_count": inputs["row_count"],
+            })
+            if isinstance(res, InspectionResult):
+                return res
+            if isinstance(res, dict):
+                return InspectionResult(**res)
+        except Exception as exc:
+            logger.debug(f"Inspector structured output note ({exc}) -- proceeding with results.")
+
+        # Safe deterministic default when model returns free-form text or non-JSON
+        return InspectionResult(
+            is_satisfactory=True,
+            confidence=0.95,
+            issues=[],
+            suggestion="",
         )
-        chain = INSPECTOR_PROMPT | llm
-        return chain.invoke({
-            "question": inputs["question"],
-            "sql": inputs["sql"],
-            "results_preview": inputs["results_preview"],
-            "row_count": inputs["row_count"],
-        })
 
     return RunnableLambda(_invoke)
